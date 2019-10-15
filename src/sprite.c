@@ -1140,6 +1140,35 @@ static void drawSheetOvr(Sprite* sprite, s32 x, s32 y)
 	for(s32 j = 0, index = (sprite->index - sprite->index % TIC_BANK_SPRITES); j < rect.h; j += TIC_SPRITESIZE)
 		for(s32 i = 0; i < rect.w; i += TIC_SPRITESIZE, index++)
 			sprite->tic->api.sprite(sprite->tic, sprite->src, index, x + i, y + j, NULL, 0);
+
+	for(s32 j = 0, index = (sprite->index - sprite->index % TIC_BANK_SPRITES); j < rect.h; j += TIC_SPRITESIZE)
+	{
+		for(s32 i = 0; i < rect.w; i += TIC_SPRITESIZE, index++)
+		{
+			if(sprite->diff[index])
+			{
+				u8 left = 1, right = 1, top = 1, bottom = 1;
+				if ((index % TIC_SPRITESHEET_COLS) != 0)
+					left = sprite->diff[index - 1];
+				if ((index % TIC_SPRITESHEET_COLS) != TIC_SPRITESHEET_SIZE - 1)
+					right = sprite->diff[index + 1];
+				if ((index / TIC_SPRITESHEET_COLS) != 0)
+					top = sprite->diff[index - TIC_SPRITESHEET_COLS];
+				if ((index / TIC_SPRITESHEET_COLS) != TIC_SPRITESHEET_COLS - 1)
+					bottom = sprite->diff[index + TIC_SPRITESHEET_COLS];
+
+				if(!left)
+					sprite->tic->api.line(sprite->tic, x + i, y + j, x + i, y + j + TIC_SPRITESIZE - 1, (tic_color_red));
+				if(!right)
+					sprite->tic->api.line(sprite->tic, x + i + TIC_SPRITESIZE - 1, y + j, x + i + TIC_SPRITESIZE - 1, y + j + TIC_SPRITESIZE - 1, (tic_color_red));
+				if(!top)
+					sprite->tic->api.line(sprite->tic, x + i, y + j, x + i + TIC_SPRITESIZE - 1, y + j, (tic_color_red));
+				if(!bottom)
+					sprite->tic->api.line(sprite->tic, x + i, y + j + TIC_SPRITESIZE - 1, x + i + TIC_SPRITESIZE - 1, y + j + TIC_SPRITESIZE - 1, (tic_color_red));
+			}
+		}
+	}
+
 	{
 		s32 bx = getIndexPosX(sprite) + x - 1;
 		s32 by = getIndexPosY(sprite) + y - 1;
@@ -1461,7 +1490,102 @@ static void copyFromClipboard(Sprite* sprite)
 		}
 
 		free(buffer);
+	}
+}
 
+static void diffWithServer(Sprite* sprite)
+{
+	memset(sprite->diff, 0, TIC_SPRITES);
+
+	char* collabUrl = getSystem()->getCollabUrl();
+	if(collabUrl)
+	{
+		s32 expectedSize = TIC_SPRITES * TIC_SPRITESIZE * TIC_SPRITESIZE * TIC_PALETTE_BPP / BITS_IN_BYTE;
+
+		char url[256];
+		snprintf(url, sizeof(url), "%s/sprite/all", collabUrl);
+
+		s32 size;
+		void *buffer = getSystem()->getUrlRequest(url, &size);
+
+		if(buffer)
+		{
+			if(size == expectedSize)
+			{
+				for(s32 y = 0, i = 0; y < TIC_SPRITES * TIC_SPRITESIZE * TIC_SPRITESIZE / TIC_SPRITESHEET_SIZE; y++)
+				{
+					for(s32 x = 0; x < TIC_SPRITESHEET_SIZE; x++)
+					{
+						u8 server = tic_tool_peek4(buffer, i++);
+						u8 mine = getSpritePixel(sprite->src->data, x, y);
+						if(server != mine)
+							sprite->diff[(y / TIC_SPRITESIZE) * TIC_SPRITESHEET_COLS + (x / TIC_SPRITESIZE)] = 1;
+					}
+				}
+			}
+			
+			free(buffer);
+		}
+	}
+}
+
+static void pushToServer(Sprite* sprite)
+{
+	char* collabUrl = getSystem()->getCollabUrl();
+	if(collabUrl)
+	{
+		s32 size = sprite->size * sprite->size * TIC_PALETTE_BPP / BITS_IN_BYTE;
+		u8* buffer = malloc(size);
+
+		if(buffer)
+		{
+			tic_rect rect = getSpriteRect(sprite);
+			s32 r = rect.x + rect.w;
+			s32 b = rect.y + rect.h;
+
+			for(s32 y = rect.y, i = 0; y < b; y++)
+				for(s32 x = rect.x; x < r; x++)
+					tic_tool_poke4(buffer, i++, getSheetPixel(sprite, x, y) & 0xf);
+
+			char url[256];
+			snprintf(url, sizeof(url), "%s/sprite/single?index=%d&size=%d", collabUrl, sprite->index, sprite->size);
+			getSystem()->putUrlRequest(url, buffer, size);
+		}
+
+		free(buffer);
+	}
+}
+
+static void pullFromServer(Sprite* sprite)
+{
+	char* collabUrl = getSystem()->getCollabUrl();
+	if(collabUrl)
+	{
+		s32 expectedSize = sprite->size * sprite->size * TIC_PALETTE_BPP / BITS_IN_BYTE;
+
+		char url[256];
+		snprintf(url, sizeof(url), "%s/sprite/single?index=%d&size=%d", collabUrl, sprite->index, sprite->size);
+
+		s32 size;
+		void *buffer = getSystem()->getUrlRequest(url, &size);
+
+		if(buffer)
+		{
+			if(size == expectedSize)
+			{
+				tic_rect rect = getSpriteRect(sprite);
+				s32 r = rect.x + rect.w;
+				s32 b = rect.y + rect.h;
+
+				for(s32 y = rect.y, i = 0; y < b; y++)
+					for(s32 x = rect.x; x < r; x++)
+						setSheetPixel(sprite, x, y, tic_tool_peek4(buffer, i++));
+
+				history_add(sprite->history);
+			}
+			
+			free(buffer);
+		}
 	}
 }
 
@@ -1688,6 +1812,9 @@ static void tick(Sprite* sprite)
 	drawSpriteToolbar(sprite);
 	drawToolbar(sprite->tic, (tic_color_gray), false);
 
+	if((sprite->tickCounter % 60) == 0)
+		diffWithServer(sprite);
+
 	sprite->tickCounter++;
 }
 
@@ -1700,6 +1827,8 @@ static void onStudioEvent(Sprite* sprite, StudioEvent event)
 	case TIC_TOOLBAR_PASTE: copyFromClipboard(sprite); break;
 	case TIC_TOOLBAR_UNDO: undo(sprite); break;
 	case TIC_TOOLBAR_REDO: redo(sprite); break;
+	case TIC_TOOLBAR_PUSH: pushToServer(sprite); break;
+	case TIC_TOOLBAR_PULL: pullFromServer(sprite); break;
 	}
 }
 
@@ -1726,6 +1855,7 @@ void initSprite(Sprite* sprite, tic_mem* tic, tic_tiles* src)
 	if(sprite->select.back == NULL) sprite->select.back = (u8*)malloc(CANVAS_SIZE*CANVAS_SIZE);
 	if(sprite->select.front == NULL) sprite->select.front = (u8*)malloc(CANVAS_SIZE*CANVAS_SIZE);
 	if(sprite->history) history_delete(sprite->history);
+	if(sprite->diff) free(sprite->diff);
 	
 	*sprite = (Sprite)
 	{
@@ -1749,6 +1879,7 @@ void initSprite(Sprite* sprite, tic_mem* tic, tic_tiles* src)
 		},
 		.mode = SPRITE_DRAW_MODE,
 		.history = history_create(src, TIC_SPRITES * sizeof(tic_tile)),
+		.diff = (u8*)malloc(TIC_SPRITES),
 		.event = onStudioEvent,
 		.overline = overline,
 		.scanline = scanline,

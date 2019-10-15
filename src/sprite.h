@@ -61,6 +61,8 @@ struct Sprite
 
 	struct History* history;
 
+	u8 *diff;
+	
 	void (*tick)(Sprite*);
 	void (*event)(Sprite*, StudioEvent);
 	void (*scanline)(tic_mem* tic, s32 row, void* data);

@@ -765,12 +765,10 @@ static void api_sprite_ex(tic_mem* memory, const tic_tiles* src, s32 index, s32 
 				else my = h-1-my;
 			}
 
-			enum {Cols = TIC_SPRITESHEET_SIZE / TIC_SPRITESIZE};
-
 			if(rotate==0 || rotate==2)
-				drawSprite(memory, src, index + mx+my*Cols, x+i*step, y+j*step, colors, count, scale, flip, rotate);
+				drawSprite(memory, src, index + mx+my*TIC_SPRITESHEET_COLS, x+i*step, y+j*step, colors, count, scale, flip, rotate);
 			else
-				drawSprite(memory, src, index + mx+my*Cols, x+j*step, y+i*step, colors, count, scale, flip, rotate);
+				drawSprite(memory, src, index + mx+my*TIC_SPRITESHEET_COLS, x+j*step, y+i*step, colors, count, scale, flip, rotate);
 		}
 	}
 }

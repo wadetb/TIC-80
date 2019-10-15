@@ -330,8 +330,7 @@ static void md5(const void* voidData, s32 length, u8* digest)
 
 static u8* getSpritePtr(tic_tile* tiles, s32 x, s32 y)
 {
-	enum { SheetCols = (TIC_SPRITESHEET_SIZE / TIC_SPRITESIZE) };
-	return tiles[x / TIC_SPRITESIZE + y / TIC_SPRITESIZE * SheetCols].data;
+	return tiles[x / TIC_SPRITESIZE + y / TIC_SPRITESIZE * TIC_SPRITESHEET_COLS].data;
 }
 
 
@@ -447,7 +446,7 @@ static void drawExtrabar(tic_mem* tic)
 {
 	enum {Size = 7};
 
-	s32 x = (COUNT_OF(Modes) + 1) * Size + 17 * TIC_FONT_WIDTH;
+	s32 x = (COUNT_OF(Modes) + 1) * Size + 16 * TIC_FONT_WIDTH;
 	s32 y = 0;
 
 	static const u8 Icons[] =
@@ -496,15 +495,34 @@ static void drawExtrabar(tic_mem* tic)
 		0b00110000,
 		0b00000000,
 		0b00000000,
+
+		0b00000000,
+		0b00010000,
+		0b00110000,
+		0b01110000,
+		0b00010000,
+		0b00010000,
+		0b00000000,
+		0b00000000,
+
+		0b00000000,
+		0b01000000,
+		0b01000000,
+		0b01110000,
+		0b01100000,
+		0b01000000,
+		0b00000000,
+		0b00000000,
 	};
 
-	static const s32 Colors[] = {8, 9, 6, 5, 5};
-	static const StudioEvent Events[] = {TIC_TOOLBAR_CUT, TIC_TOOLBAR_COPY, TIC_TOOLBAR_PASTE,	TIC_TOOLBAR_UNDO, TIC_TOOLBAR_REDO};
-	static const char* Tips[] = {"CUT [ctrl+x]", "COPY [ctrl+c]", "PASTE [ctrl+v]", "UNDO [ctrl+z]", "REDO [ctrl+y]"};
+	static const s32 Widths[] = {6, 6, 7, 6, 7, 4, 4};
+	static const s32 Colors[] = {8, 9, 6, 5, 5, 6, 6};
+	static const StudioEvent Events[] = {TIC_TOOLBAR_CUT, TIC_TOOLBAR_COPY, TIC_TOOLBAR_PASTE,	TIC_TOOLBAR_UNDO, TIC_TOOLBAR_REDO, TIC_TOOLBAR_PUSH, TIC_TOOLBAR_PULL};
+	static const char* Tips[] = {"CUT [ctrl+x]", "COPY [ctrl+c]", "PASTE [ctrl+v]", "UNDO [ctrl+z]", "REDO [ctrl+y]", "PUSH [ctrl-p]", "PULL [ctrl-l]"};
 
 	for(s32 i = 0; i < sizeof Icons / BITS_IN_BYTE; i++)
 	{
-		tic_rect rect = {x + i*Size, y, Size, Size};
+		tic_rect rect = {x, y, Widths[i], Size};
 
 		u8 bgcolor = (tic_color_white);
 		u8 color = (tic_color_light_blue);
@@ -527,8 +545,10 @@ static void drawExtrabar(tic_mem* tic)
 			}
 		}
 
-		impl.studio.tic->api.rect(tic, x + i * Size, y, Size, Size, bgcolor);
-		drawBitIcon(x + i * Size, y, Icons + i*BITS_IN_BYTE, color);
+		impl.studio.tic->api.rect(tic, x, y, Widths[i], Size, bgcolor);
+		drawBitIcon(x, y, Icons + i*BITS_IN_BYTE, color);
+
+		x += Widths[i];
 	}
 }
 

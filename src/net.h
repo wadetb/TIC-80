@@ -27,5 +27,6 @@
 typedef struct Net Net;
 
 Net* createNet();
-void* netGetRequest(Net* net, const char* path, s32* size);
+void* netGetRequest(Net* net, const char *host, u16 port, const char* path, s32* size);
+void netPutRequest(Net* net, const char *host, u16 port, const char* path, void *data, s32 size);
 void closeNet(Net* net);

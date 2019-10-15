@@ -656,6 +656,14 @@ static void copyFromClipboard(Music* music)
 	}
 }
 
+static void pushToServer(Music* music)
+{
+}
+
+static void pullFromServer(Music* music)
+{
+}
+
 static void setChannelPatternValue(Music* music, s32 patternId, s32 channel)
 {
 	tic_track* track = getTrack(music);
@@ -1015,6 +1023,8 @@ static void processKeyboard(Music* music)
 	case TIC_CLIPBOARD_CUT: copyToClipboard(music, true); break;
 	case TIC_CLIPBOARD_COPY: copyToClipboard(music, false); break;
 	case TIC_CLIPBOARD_PASTE: copyFromClipboard(music); break;
+	case TIC_TOOLBAR_PUSH: pushToServer(music); break;
+	case TIC_TOOLBAR_PULL: pullFromServer(music); break;
 	default: break;
 	}
 
@@ -1634,6 +1644,8 @@ static void onStudioEvent(Music* music, StudioEvent event)
 	case TIC_TOOLBAR_PASTE: copyFromClipboard(music); break;
 	case TIC_TOOLBAR_UNDO: undo(music); break;
 	case TIC_TOOLBAR_REDO: redo(music); break;
+	case TIC_TOOLBAR_PUSH: pushToServer(music); break;
+	case TIC_TOOLBAR_PULL: pullFromServer(music); break;
 	default: break;
 	}
 }

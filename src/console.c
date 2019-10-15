@@ -1525,6 +1525,27 @@ static void onConsoleSurfCommand(Console* console, const char* param)
 	commandDone(console);
 }
 
+static void onConsoleCollabCommand(Console* console, const char* param)
+{
+	if(param && strlen(param))
+	{
+		s32 size;
+		void *buffer = getSystem()->getUrlRequest(param, &size);
+		if(buffer && size)
+		{
+			getSystem()->setCollabUrl(param);
+			printFront(console, "\n");
+			printFront(console, buffer);
+		}
+		else printBack(console, "\nfailed to connect");
+		if(buffer)
+			free(buffer);
+	}
+	else printBack(console, "\ninvalid collab server");
+
+	commandDone(console);
+}
+
 static void onConsoleCodeCommand(Console* console, const char* param)
 {
 	gotoCode();
@@ -2430,6 +2451,7 @@ static const struct
 	{"version",	NULL, "show the current version",	onConsoleVersionCommand},
 	{"edit",	NULL, "open cart editor",			onConsoleCodeCommand},
 	{"surf",	NULL, "open carts browser",			onConsoleSurfCommand},
+	{"collab",	NULL, "connect to collab server",	onConsoleCollabCommand},
 };
 
 static bool predictFilename(const char* name, const char* info, s32 id, void* data, bool dir)
@@ -2719,7 +2741,7 @@ static NetVersion netVersionRequest()
 	};
 
 	s32 size = 0;
-	void* buffer = getSystem()->getUrlRequest("/api?fn=version", &size);
+	void* buffer = getSystem()->getUrlRequest("http://"TIC_HOST"/api?fn=version", &size);
 
 	if(buffer && size)
 	{

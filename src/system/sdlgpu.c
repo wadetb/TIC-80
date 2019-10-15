@@ -102,6 +102,11 @@ static struct
 		const u8* src;
 	} mouse;
 
+	struct
+	{
+		char url[FILENAME_MAX];
+	} collab;
+	
 	Net* net;
 
 	bool missedFrame;
@@ -142,8 +147,7 @@ static void initSound()
 
 static const u8* getSpritePtr(const tic_tile* tiles, s32 x, s32 y)
 {
-	enum { SheetCols = (TIC_SPRITESHEET_SIZE / TIC_SPRITESIZE) };
-	return tiles[x / TIC_SPRITESIZE + y / TIC_SPRITESIZE * SheetCols].data;
+	return tiles[x / TIC_SPRITESIZE + y / TIC_SPRITESIZE * TIC_SPRITESHEET_COLS].data;
 }
 
 static u8 getSpritePixel(const tic_tile* tiles, s32 x, s32 y)
@@ -1190,9 +1194,75 @@ static void openSystemPath(const char* path) {}
 
 #endif
 
+typedef struct
+{
+	char host[1024];
+	s16 port;
+	char path[1024];
+} URLParts;
+
+static bool splitUrl(const char *url, URLParts *parts)
+{
+	strcpy(parts->host, "");
+	parts->port = 80;
+	strcpy(parts->path, "");
+
+	const char *urlStart = url;
+	if(strncmp(url, "http://", 7) == 0)
+		urlStart += 7;
+	else if (strstr(url, "://"))
+		return false;
+
+	char urlCopy[1024];
+	snprintf(urlCopy, sizeof(urlCopy), "%s", urlStart);
+
+	char* path = strchr(urlCopy, '/');
+	if(path)
+	{
+		snprintf(parts->path, sizeof(parts->path), "%s", path);
+		*path = '\0';
+	}
+
+	char* port = strchr(urlCopy, ':');
+	if(port)
+	{
+		parts->port = strtoul(port + 1, NULL, 10);
+		*port = '\0';
+	}
+
+	snprintf(parts->host, sizeof(parts->host), "%s", urlCopy);
+
+	return true;
+}
+
+static void setCollabUrl(const char* collabUrl)
+{
+	snprintf(platform.collab.url, sizeof(platform.collab.url), "%s", collabUrl);
+}
+
+static char* getCollabUrl()
+{
+	if (platform.collab.url[0] != '\0')
+		return platform.collab.url;
+	else return NULL;
+}
+
 static void* getUrlRequest(const char* url, s32* size)
 {
-	return netGetRequest(platform.net, url, size);
+	printf("getUrlRequest %s\n", url);
+	URLParts parts;
+	if (!splitUrl(url, &parts))
+		return NULL;
+	return netGetRequest(platform.net, parts.host, parts.port, parts.path, size);
+}
+
+static void putUrlRequest(const char* url, void *data, s32 size)
+{
+	printf("putUrlRequest %s\n", url);
+	URLParts parts;
+	if (!splitUrl(url, &parts))
+		return;
+	netPutRequest(platform.net, parts.host, parts.port, parts.path, data, size);
 }
 
 static void preseed()
@@ -1314,7 +1384,11 @@ static System systemInterface =
 	.getPerformanceCounter = getPerformanceCounter,
 	.getPerformanceFrequency = getPerformanceFrequency,
 
+	.setCollabUrl = setCollabUrl,
+	.getCollabUrl = getCollabUrl,
+
 	.getUrlRequest = getUrlRequest,
+	.putUrlRequest = putUrlRequest,
 
 	.fileDialogLoad = file_dialog_load,
 	.fileDialogSave = file_dialog_save,

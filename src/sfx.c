@@ -666,6 +666,14 @@ static void copyWaveFromClipboard(Sfx* sfx)
 		history_add(sfx->history);
 }
 
+static void pushToServer(Sfx* sfx)
+{
+}
+
+static void pullFromServer(Sfx* sfx)
+{
+}
+
 static void processKeyboard(Sfx* sfx)
 {
 	tic_mem* tic = sfx->tic;
@@ -1025,6 +1033,8 @@ static void onStudioWaveformEvent(Sfx* sfx, StudioEvent event)
 	case TIC_TOOLBAR_PASTE: copyWaveFromClipboard(sfx); break;
 	case TIC_TOOLBAR_UNDO: undo(sfx); break;
 	case TIC_TOOLBAR_REDO: redo(sfx); break;
+	case TIC_TOOLBAR_PUSH: pushToServer(sfx); break;
+	case TIC_TOOLBAR_PULL: pullFromServer(sfx); break;
 	default: break;
 	}
 }

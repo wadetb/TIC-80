@@ -16,7 +16,11 @@ typedef struct
 	u64 	(*getPerformanceCounter)();
 	u64 	(*getPerformanceFrequency)();
 
+	void  (*setCollabUrl)(const char* collabUrl);
+	char* (*getCollabUrl)();
+
 	void* (*getUrlRequest)(const char* url, s32* size);
+	void  (*putUrlRequest)(const char* url, void *data, s32 size);
 
 	void (*fileDialogLoad)(file_dialog_load_callback callback, void* data);
 	void (*fileDialogSave)(file_dialog_save_callback callback, const char* name, const u8* buffer, size_t size, void* data, u32 mode);

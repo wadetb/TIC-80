@@ -602,6 +602,14 @@ static void copyFromClipboard(Code* code)
 	}
 }
 
+static void pushToServer(Code* code)
+{
+}
+
+static void pullFromServer(Code* code)
+{
+}
+
 static void update(Code* code)
 {
 	updateEditor(code);
@@ -1472,6 +1480,8 @@ static void onStudioEvent(Code* code, StudioEvent event)
 	case TIC_TOOLBAR_PASTE: copyFromClipboard(code); break;
 	case TIC_TOOLBAR_UNDO: undo(code); break;
 	case TIC_TOOLBAR_REDO: redo(code); break;
+	case TIC_TOOLBAR_PUSH: pushToServer(code); break;
+	case TIC_TOOLBAR_PULL: pullFromServer(code); break;
 	}
 }
 

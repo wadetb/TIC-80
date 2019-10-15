@@ -61,18 +61,32 @@ static void netClearCache(Net* net)
 
 typedef struct
 {
+	const char *host;
+	u16 port;
+	const char *method;
+	const char *path;
+	u8 *data;
+	s32 size;
+	s32 timeout;
+}Request;
+
+typedef struct
+{
 	u8* data;
 	s32 size;
 }Buffer;
 
-static Buffer httpRequest(const char* path, s32 timeout)
+static Buffer httpRequest(Request* req)
 {
 	Buffer buffer = {.data = NULL, .size = 0};
+
+	if (strlen(req->path) == 0)
+		req->path = "/";
 
 	{
 		IPaddress ip;
 
-		if (SDLNet_ResolveHost(&ip, TIC_HOST, 80) >= 0)
+		if (SDLNet_ResolveHost(&ip, req->host, req->port) >= 0)
 		{
 			TCPsocket sock = SDLNet_TCP_Open(&ip);
 
@@ -85,13 +99,15 @@ static Buffer httpRequest(const char* path, s32 timeout)
 					SDLNet_TCP_AddSocket(set, sock);
 
 					{
-						char message[FILENAME_MAX];
-						memset(message, 0, sizeof message);
-						sprintf(message, "GET %s HTTP/1.0\r\nHost: " TIC_HOST "\r\n\r\n", path);
-						SDLNet_TCP_Send(sock, message, (s32)strlen(message) + 1);
+						char header[FILENAME_MAX];
+						memset(header, 0, sizeof header);
+						sprintf(header, "%s %s HTTP/1.0\r\nHost: " TIC_HOST "\r\nContent-Length: %d\r\n\r\n", req->method, req->path, req->size);
+						SDLNet_TCP_Send(sock, header, (s32)strlen(header));
+						if(req->data && req->size)
+							SDLNet_TCP_Send(sock, req->data, req->size);
 					}
 
-					if(SDLNet_CheckSockets(set, timeout) == 1 && SDLNet_SocketReady(sock))
+					if(SDLNet_CheckSockets(set, req->timeout) == 1 && SDLNet_SocketReady(sock))
 					{
 						enum {Size = 4*1024+1};
 						buffer.data = malloc(Size);
@@ -123,9 +139,9 @@ static Buffer httpRequest(const char* path, s32 timeout)
 	return buffer;
 }
 
-static void getRequest(Net* net, const char* path, NetResponse callback, void* data)
+static void getRequest(Net* net, const char *host, u16 port, const char* path, NetResponse callback, void* data)
 {
-	if(strcmp(net->cache.path, path) == 0)
+	if(strcmp(host, TIC_HOST) == 0 && port == 80 && strcmp(net->cache.path, path) == 0)
 	{
 		callback(net->cache.buffer, net->cache.size, data);
 	}
@@ -135,8 +151,16 @@ static void getRequest(Net* net, const char* path, NetResponse callback, void* d
 
 		bool done = false;
 
-		enum {Timeout = 3000};
-		Buffer buffer = httpRequest(path, Timeout);
+		Request req = {
+			.host = host,
+			.port = port,
+			.method = "GET",
+			.path = path,
+			.data = NULL,
+			.size = 0,
+			.timeout = 3000
+		};
+		Buffer buffer = httpRequest(&req);
 
 		if(buffer.data && buffer.size)
 		{
@@ -175,6 +199,59 @@ static void getRequest(Net* net, const char* path, NetResponse callback, void* d
 	}
 }
 
+static void putRequest(Net* net, const char *host, u16 port, const char* path, void* data, s32 dataSize, NetResponse callback)
+{
+	netClearCache(net);
+
+	bool done = false;
+
+	Request req = {
+		.host = host,
+		.port = port,
+		.method = "PUT",
+		.path = path,
+		.data = data,
+		.size = dataSize,
+		.timeout = 3000
+	};
+	Buffer buffer = httpRequest(&req);
+
+	if(buffer.data && buffer.size)
+	{
+		if(strstr((char*)buffer.data, "200 OK"))
+		{
+			s32 contentLength = 0;
+
+			{
+				static const char ContentLength[] = "Content-Length:";
+
+				char* start = strstr((char*)buffer.data, ContentLength);
+
+				if(start)
+					contentLength = atoi(start + sizeof(ContentLength));
+			}
+
+			static const char Start[] = "\r\n\r\n";
+			u8* start = (u8*)strstr((char*)buffer.data, Start);
+
+			if(start)
+			{
+				strcpy(net->cache.path, path);
+				net->cache.size = contentLength ? contentLength : buffer.size - (s32)(start - buffer.data);
+				net->cache.buffer = (u8*)malloc(net->cache.size);
+				memcpy(net->cache.buffer, start + sizeof Start - 1, net->cache.size);
+				callback(net->cache.buffer, net->cache.size, data);
+				done = true;
+			}
+		}
+
+		free(buffer.data);
+	}
+
+	if(!done)
+		callback(NULL, 0, data);
+}
+
 #endif
 
 typedef struct
@@ -192,12 +269,21 @@ static void onGetResponse(u8* buffer, s32 size, void* data)
 	memcpy(netGetData->buffer, buffer, size);
 }
 
-void* netGetRequest(Net* net, const char* path, s32* size)
+void* netGetRequest(Net* net, const char *host, u16 port, const char* path, s32* size)
 {
 	NetGetData netGetData = {NULL, size};
-	getRequest(net, path, onGetResponse, &netGetData);
+	getRequest(net, host, port, path, onGetResponse, &netGetData);
 
 	return netGetData.buffer;
+}
+
+static void onPutResponse(u8* buffer, s32 size, void* data)
+{
+}
+
+void netPutRequest(Net* net, const char *host, u16 port, const char* path, void *data, s32 size)
+{
+	putRequest(net, host, port, path, data, size, onPutResponse);
 }
 
 Net* createNet()
