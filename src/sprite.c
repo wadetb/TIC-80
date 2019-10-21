@@ -1529,15 +1529,42 @@ static void diffWithServer(Sprite* sprite)
 	}
 }
 
-static void pushToServer(Sprite* sprite)
+static void pushSelectionToServer(Sprite* sprite)
 {
-	char* collabUrl = getSystem()->getCollabUrl();
-	if(collabUrl)
-	{
-		s32 size = sprite->size * sprite->size * TIC_PALETTE_BPP / BITS_IN_BYTE;
-		u8* buffer = malloc(size);
+	s32 size = sprite->size * sprite->size * TIC_PALETTE_BPP / BITS_IN_BYTE;
+	u8* buffer = malloc(size);
 
-		if(buffer)
+	if(buffer)
+	{
+		tic_rect rect = getSpriteRect(sprite);
+		s32 r = rect.x + rect.w;
+		s32 b = rect.y + rect.h;
+
+		for(s32 y = rect.y, i = 0; y < b; y++)
+			for(s32 x = rect.x; x < r; x++)
+				tic_tool_poke4(buffer, i++, getSheetPixel(sprite, x, y) & 0xf);
+
+		char url[256];
+		snprintf(url, sizeof(url), "%s/sprite/single?index=%d&size=%d", getSystem()->getCollabUrl(), sprite->index, sprite->size);
+		getSystem()->putUrlRequest(url, buffer, size);
+
+		free(buffer);
+	}
+}
+
+static void pullSelectionFromServer(Sprite* sprite)
+{
+	s32 expectedSize = sprite->size * sprite->size * TIC_PALETTE_BPP / BITS_IN_BYTE;
+
+	char url[256];
+	snprintf(url, sizeof(url), "%s/sprite/single?index=%d&size=%d", getSystem()->getCollabUrl(), sprite->index, sprite->size);
+
+	s32 size;
+	void *buffer = getSystem()->getUrlRequest(url, &size);
+
+	if(buffer)
+	{
+		if(size == expectedSize)
 		{
 			tic_rect rect = getSpriteRect(sprite);
 			s32 r = rect.x + rect.w;
@@ -1545,47 +1572,112 @@ static void pushToServer(Sprite* sprite)
 
 			for(s32 y = rect.y, i = 0; y < b; y++)
 				for(s32 x = rect.x; x < r; x++)
-					tic_tool_poke4(buffer, i++, getSheetPixel(sprite, x, y) & 0xf);
+					setSheetPixel(sprite, x, y, tic_tool_peek4(buffer, i++));
 
-			char url[256];
-			snprintf(url, sizeof(url), "%s/sprite/single?index=%d&size=%d", collabUrl, sprite->index, sprite->size);
-			getSystem()->putUrlRequest(url, buffer, size);
+			history_add(sprite->history);
 		}
+		
+		free(buffer);
+	}
+}
+
+static void pushAllToServer(Sprite* sprite)
+{
+	s32 size = TIC_SPRITES * TIC_SPRITESIZE * TIC_SPRITESIZE * TIC_PALETTE_BPP / BITS_IN_BYTE;
+	u8* buffer = malloc(size);
+
+	if(buffer)
+	{
+		for(s32 y = 0, i = 0; y < TIC_SPRITES * TIC_SPRITESIZE * TIC_SPRITESIZE / TIC_SPRITESHEET_SIZE; y++)
+			for(s32 x = 0; x < TIC_SPRITESHEET_SIZE; x++)
+				tic_tool_poke4(buffer, i++, getSpritePixel(sprite->src->data, x, y));
+
+		char url[256];
+		snprintf(url, sizeof(url), "%s/sprite/all", getSystem()->getCollabUrl());
+		getSystem()->putUrlRequest(url, buffer, size);
 
 		free(buffer);
 	}
 }
 
+static void pullAllFromServer(Sprite* sprite)
+{
+	s32 expectedSize = TIC_SPRITES * TIC_SPRITESIZE * TIC_SPRITESIZE * TIC_PALETTE_BPP / BITS_IN_BYTE;
+
+	char url[256];
+	snprintf(url, sizeof(url), "%s/sprite/all", getSystem()->getCollabUrl());
+
+	s32 size;
+	void *buffer = getSystem()->getUrlRequest(url, &size);
+
+	if(buffer)
+	{
+		if(size == expectedSize)
+		{
+			for(s32 y = 0, i = 0; y < TIC_SPRITES * TIC_SPRITESIZE * TIC_SPRITESIZE / TIC_SPRITESHEET_SIZE; y++)
+				for(s32 x = 0; x < TIC_SPRITESHEET_SIZE; x++)
+					setSpritePixel(sprite->src->data, x, y, tic_tool_peek4(buffer, i++));
+
+			history_add(sprite->history);
+		}
+		
+		free(buffer);
+	}
+}
+
+static void pushPaletteToServer(Sprite* sprite)
+{
+	char url[256];
+	snprintf(url, sizeof(url), "%s/palette", getSystem()->getCollabUrl());
+	getSystem()->putUrlRequest(url, getBankPalette()->colors, TIC_PALETTE_SIZE * sizeof(tic_rgb));
+}
+
+static void pullPaletteFromServer(Sprite* sprite)
+{
+	char url[256];
+	snprintf(url, sizeof(url), "%s/palette", getSystem()->getCollabUrl());
+
+	s32 size;
+	void *buffer = getSystem()->getUrlRequest(url, &size);
+
+	if(buffer)
+	{
+		if(size == TIC_PALETTE_SIZE * sizeof(tic_rgb))
+			memcpy(getBankPalette()->colors, buffer, TIC_PALETTE_SIZE * sizeof(tic_rgb));
+		
+		free(buffer);
+	}
+}
+
+static void pushToServer(Sprite* sprite)
+{
+	if(!getSystem()->getCollabUrl())
+		return;
+
+	if(sprite->tic->api.key(sprite->tic, tic_key_shift))
+	{
+		pushAllToServer(sprite);
+		pushPaletteToServer(sprite);
+	}
+	else
+	{
+		pushSelectionToServer(sprite);
+	}
+}
+
 static void pullFromServer(Sprite* sprite)
 {
-	char* collabUrl = getSystem()->getCollabUrl();
-	if(collabUrl)
+	if(!getSystem()->getCollabUrl())
+		return;
+
+	if(sprite->tic->api.key(sprite->tic, tic_key_shift))
 	{
-		s32 expectedSize = sprite->size * sprite->size * TIC_PALETTE_BPP / BITS_IN_BYTE;
-
-		char url[256];
-		snprintf(url, sizeof(url), "%s/sprite/single?index=%d&size=%d", collabUrl, sprite->index, sprite->size);
-
-		s32 size;
-		void *buffer = getSystem()->getUrlRequest(url, &size);
-
-		if(buffer)
-		{
-			if(size == expectedSize)
-			{
-				tic_rect rect = getSpriteRect(sprite);
-				s32 r = rect.x + rect.w;
-				s32 b = rect.y + rect.h;
-
-				for(s32 y = rect.y, i = 0; y < b; y++)
-					for(s32 x = rect.x; x < r; x++)
-						setSheetPixel(sprite, x, y, tic_tool_peek4(buffer, i++));
-
-				history_add(sprite->history);
-			}
-			
-			free(buffer);
-		}
+		pullAllFromServer(sprite);
+		pullPaletteFromServer(sprite);
+	}
+	else
+	{
+		pullSelectionFromServer(sprite);
 	}
 }
 

@@ -6,7 +6,11 @@ from urllib.parse import urlparse, parse_qs
 PORT = 8000
 
 BITS_IN_BYTE = 8
+
 TIC_PALETTE_BPP = 4
+TIC_PALETTE_SIZE = (1 << TIC_PALETTE_BPP)
+TIC_PALETTE_CHANNELS = 3
+
 TIC_BANK_SPRITES = (1 << BITS_IN_BYTE)
 TIC_SPRITE_BANKS = 2
 TIC_SPRITES = (TIC_BANK_SPRITES * TIC_SPRITE_BANKS)
@@ -14,10 +18,12 @@ TIC_SPRITESIZE = 8
 TIC_SPRITESHEET_COLS = 16
 TIC_SPRITESHEET_SIZE = (TIC_SPRITESHEET_COLS * TIC_SPRITESIZE)
 
+
 class TIC:
     def __init__(self):
         self.tiles = [bytearray(b'\0' * (TIC_SPRITESIZE * TIC_SPRITESIZE * TIC_PALETTE_BPP // BITS_IN_BYTE)) 
                       for _ in range(TIC_BANK_SPRITES * TIC_SPRITE_BANKS)]
+        self.palette = bytearray(b'\0' * TIC_PALETTE_SIZE * TIC_PALETTE_CHANNELS)
 
     def set_pixel(self, x, y, color):
         tile_x = x // TIC_SPRITESIZE
@@ -46,6 +52,12 @@ class TIC:
             return (tile[tile_offset] >> 4) & 0x0f
         else:
             return tile[tile_offset]  & 0x0f
+
+    def set_palette(self, buffer):
+        self.palette = buffer
+
+    def get_palette(self):
+        return self.palette
 
 tic = TIC()
 
@@ -92,12 +104,33 @@ class CollabHandler(http.server.BaseHTTPRequestHandler):
 
             self.wfile.write(buffer)
 
+        if self.path.startswith('/palette'):
+            buffer = tic.get_palette()
+
+            self.send_response(200)
+            self.send_header('Content-Length', '{}'.format(len(buffer)))
+            self.end_headers()
+
+            self.wfile.write(buffer)
+
         else:
             self.send_response(400)
             self.end_headers()
 
 
     def do_PUT(self):
+        if self.path.startswith('/sprite/all'):
+            buffer = self.rfile.read(TIC_SPRITES * TIC_SPRITESIZE * TIC_SPRITESIZE * TIC_PALETTE_BPP // BITS_IN_BYTE)
+
+            for y in range(TIC_SPRITES * TIC_SPRITESIZE * TIC_SPRITESIZE // TIC_SPRITESHEET_SIZE):
+                for x in range(TIC_SPRITESHEET_SIZE):
+                    buffer_offset = (y * TIC_SPRITESHEET_SIZE + x) * TIC_PALETTE_BPP // BITS_IN_BYTE
+                    color = (buffer[buffer_offset] >> (TIC_PALETTE_BPP if x & 1 else 0)) & 0x0f
+                    tic.set_pixel(x, y, color)
+
+            self.send_response(200)
+            self.end_headers()
+
         if self.path.startswith('/sprite/single'):
             query = parse_qs(urlparse(self.path).query)
             index = int(query['index'][0])
@@ -112,6 +145,13 @@ class CollabHandler(http.server.BaseHTTPRequestHandler):
                     buffer_offset = (y * size + x) * TIC_PALETTE_BPP // BITS_IN_BYTE
                     color = (buffer[buffer_offset] >> (TIC_PALETTE_BPP if x & 1 else 0)) & 0x0f
                     tic.set_pixel(tile_x * TIC_SPRITESIZE + x, tile_y * TIC_SPRITESIZE + y, color)
+
+            self.send_response(200)
+            self.end_headers()
+
+        if self.path.startswith('/palette'):
+            buffer = self.rfile.read(TIC_PALETTE_SIZE * TIC_PALETTE_CHANNELS)
+            tic.set_palette(buffer)
 
             self.send_response(200)
             self.end_headers()
