@@ -61,7 +61,8 @@ struct Sprite
 
 	struct History* history;
 
-	u8 *diff;
+	u8 diff[TIC_SPRITES];
+	u8 palette_diff[TIC_PALETTE_SIZE];
 	
 	void (*tick)(Sprite*);
 	void (*event)(Sprite*, StudioEvent);

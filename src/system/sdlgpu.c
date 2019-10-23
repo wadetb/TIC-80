@@ -1249,7 +1249,6 @@ static char* getCollabUrl()
 
 static void* getUrlRequest(const char* url, s32* size)
 {
-	printf("getUrlRequest %s\n", url);
 	URLParts parts;
 	if (!splitUrl(url, &parts))
 		return NULL;
@@ -1258,11 +1257,18 @@ static void* getUrlRequest(const char* url, s32* size)
 
 static void putUrlRequest(const char* url, void *data, s32 size)
 {
-	printf("putUrlRequest %s\n", url);
 	URLParts parts;
 	if (!splitUrl(url, &parts))
 		return;
 	netPutRequest(platform.net, parts.host, parts.port, parts.path, data, size);
+}
+
+static void getUrlStream(const char* url, url_stream_callback callback, void *data)
+{
+	URLParts parts;
+	if (!splitUrl(url, &parts))
+		return;
+	netGetStream(platform.net, parts.host, parts.port, parts.path);
 }
 
 static void preseed()
@@ -1389,6 +1395,8 @@ static System systemInterface =
 
 	.getUrlRequest = getUrlRequest,
 	.putUrlRequest = putUrlRequest,
+
+	.getUrlStream = getUrlStream,
 
 	.fileDialogLoad = file_dialog_load,
 	.fileDialogSave = file_dialog_save,

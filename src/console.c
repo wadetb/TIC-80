@@ -1534,8 +1534,14 @@ static void onConsoleCollabCommand(Console* console, const char* param)
 		if(buffer && size)
 		{
 			getSystem()->setCollabUrl(param);
-			printFront(console, "\n");
-			printFront(console, buffer);
+
+			char welcome[1024];
+			snprintf(welcome, sizeof(welcome), "\n%.*s", size, (char*)buffer);
+			printFront(console, welcome);
+
+			char url[1024];
+			snprintf(url, sizeof(url), "%s/watch", param);
+			getSystem()->getUrlStream(url, NULL, NULL);
 		}
 		else printBack(console, "\nfailed to connect");
 		if(buffer)
