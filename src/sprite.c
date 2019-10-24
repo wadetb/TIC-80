@@ -1142,20 +1142,6 @@ static void drawSheet(Sprite* sprite, s32 x, s32 y)
 	}
 }
 
-static void diffSheet(Sprite *sprite)
-{
-	memset(sprite->server.diff, 0, TIC_SPRITES);
-
-	for(s32 index = 0; index < TIC_SPRITES; index++)
-	{
-		tic_tile *server = &sprite->server.tiles.data[index];
-		tic_tile *mine = &sprite->src->data[index];
-
-		if(memcmp(server, mine, sizeof(tic_tile)))
-			sprite->server.diff[index] = 1;
-	}
-}
-
 static void drawSheetOvr(Sprite* sprite, s32 x, s32 y)
 {
 	tic_rect rect = {x, y, TIC_SPRITESHEET_SIZE, TIC_SPRITESHEET_SIZE};
@@ -1163,8 +1149,6 @@ static void drawSheetOvr(Sprite* sprite, s32 x, s32 y)
 	for(s32 j = 0, index = (sprite->index - sprite->index % TIC_BANK_SPRITES); j < rect.h; j += TIC_SPRITESIZE)
 		for(s32 i = 0; i < rect.w; i += TIC_SPRITESIZE, index++)
 			sprite->tic->api.sprite(sprite->tic, sprite->src, index, x + i, y + j, NULL, 0);
-
-	diffSheet(sprite);
 
 	for(s32 j = 0, index = (sprite->index - sprite->index % TIC_BANK_SPRITES); j < rect.h; j += TIC_SPRITESIZE)
 	{
@@ -1545,22 +1529,6 @@ static void putCollabData(const char* path, void *data, s32 size)
 	getSystem()->putUrlRequest(url, data, size);
 }
 
-static void checkForServerUpdates(Sprite *sprite)
-{
-	char* collabUrl = getSystem()->getCollabUrl();
-	if(!collabUrl)
-		return;
-
-	if (checkCollabEvent(TIC_COLLAB_SPRITES_CHANGED))
-		getCollabData("/sprite/all", &sprite->server.tiles, sizeof(tic_tiles) * TIC_SPRITE_BANKS);
-
-	if (checkCollabEvent(TIC_COLLAB_FLAGS_CHANGED))
-		getCollabData("/flags/all", &sprite->server.flags, sizeof(tic_flags));
-
-	if (checkCollabEvent(TIC_COLLAB_PALETTE_CHANGED))
-		getCollabData("/palette", &sprite->server.palette, sizeof(tic_palette));
-}
-
 static void pushSpriteSelectionToServer(Sprite* sprite)
 {
 	s32 sizeInTiles = sprite->size / TIC_SPRITESIZE;
@@ -1701,6 +1669,37 @@ static void pullFromServer(Sprite* sprite)
 	}
 
 	history_add(sprite->history);
+}
+
+static void diff(Sprite *sprite)
+{
+	sprite->server.dirty = false;
+
+	tic_tile *serverTiles = &sprite->server.tiles.data;
+	tic_tile *myTiles = &sprite->src->data;
+
+	u8 *serverFlags = &sprite->server.flags.data;
+	u8 *myFlags = &sprite->tic->cart.bank0.flags.data;
+
+	for(s32 index = 0; index < TIC_SPRITES; index++)
+	{
+		bool diff = (myFlags[index] != serverFlags[index]) ||
+		            memcmp(&serverTiles[index], &myTiles[index], sizeof(tic_tile)) != 0;
+		sprite->server.diff[index] = diff;
+		if(diff)
+			sprite->server.dirty = true;
+	}
+
+	if(memcmp(sprite->server.palette.data, sprite->tic->cart.bank0.palette.data, sizeof(tic_palette)) != 0)
+		sprite->server.dirty = true;
+}
+
+static void onPull(Sprite *sprite)
+{
+	getCollabData("/sprite/all", &sprite->server.tiles, sizeof(tic_tiles) * TIC_SPRITE_BANKS);
+	getCollabData("/flags/all", &sprite->server.flags, sizeof(tic_flags));
+	getCollabData("/palette", &sprite->server.palette, sizeof(tic_palette));
+	diff(sprite);
 }
 
 static void upSprite(Sprite* sprite)
@@ -1926,7 +1925,7 @@ static void tick(Sprite* sprite)
 	drawSpriteToolbar(sprite);
 	drawToolbar(sprite->tic, (tic_color_gray), false);
 
-	checkForServerUpdates(sprite);
+	diff(sprite);
 
 	sprite->tickCounter++;
 }
@@ -1992,6 +1991,7 @@ void initSprite(Sprite* sprite, tic_mem* tic, tic_tiles* src)
 		.mode = SPRITE_DRAW_MODE,
 		.history = history_create(src, TIC_SPRITES * sizeof(tic_tile)),
 		.event = onStudioEvent,
+		.pull = onPull,
 		.overline = overline,
 		.scanline = scanline,
 	};

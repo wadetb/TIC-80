@@ -63,6 +63,7 @@ struct Sprite
 
 	struct
 	{
+		bool dirty;
 		u8 diff[TIC_SPRITES];
 		tic_tiles tiles;
 		tic_tiles sprites;
@@ -72,6 +73,7 @@ struct Sprite
 	
 	void (*tick)(Sprite*);
 	void (*event)(Sprite*, StudioEvent);
+	void (*pull)(Sprite*);
 	void (*scanline)(tic_mem* tic, s32 row, void* data);
 	void (*overline)(tic_mem* tic, void* data);
 };

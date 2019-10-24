@@ -29,8 +29,6 @@
 
 struct Net
 {
-	volatile u32 streamCounter;
-
 	struct
 	{
 		u8* buffer;
@@ -351,8 +349,6 @@ Net* createNet()
 
 	*net = (Net)
 	{
-		.streamCounter = 0,
-
 		.cache = 
 		{
 			.buffer = NULL,

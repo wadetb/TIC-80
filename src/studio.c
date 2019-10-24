@@ -686,6 +686,17 @@ static void drawBankIcon(s32 x, s32 y)
 
 #endif
 
+bool modeHasChanges(EditorMode mode)
+{
+	switch(mode)
+	{
+	case TIC_SPRITE_MODE:
+		return impl.editor[impl.bank.index.sprites].sprite->server.dirty;
+	default:
+		return false;
+	}
+}
+
 void drawToolbar(tic_mem* tic, u8 color, bool bg)
 {
 	if(bg)
@@ -755,15 +766,6 @@ void drawToolbar(tic_mem* tic, u8 color, bool bg)
 
 	static const char* Tips[] = {"CODE EDITOR [f1]", "SPRITE EDITOR [f2]", "MAP EDITOR [f3]", "SFX EDITOR [f4]", "MUSIC EDITOR [f5]",};
 
-	static u32 ChangeMasks[] = 
-	{
-		0, 
-		TIC_COLLAB_SPRITES_CHANGED | TIC_COLLAB_FLAGS_CHANGED | TIC_COLLAB_PALETTE_CHANGED, 
-		0,
-		0,
-		0,
-	};
-
 	s32 mode = -1;
 
 	for(s32 i = 0; i < COUNT_OF(Modes); i++)
@@ -792,8 +794,8 @@ void drawToolbar(tic_mem* tic, u8 color, bool bg)
 		if(mode == i)
 			drawBitIcon(i * Size, 1, Icons + i * BITS_IN_BYTE, tic_color_black);
 
-		u8 icon = 
-			(impl.collab.changed & ChangeMasks[i]) ? tic_color_yellow :
+		u8 icon =
+			modeHasChanges(Modes[i]) ? tic_color_yellow :
 			(mode == i) ? tic_color_white :
 			over ? tic_color_dark_gray :
 			tic_color_light_blue;
@@ -836,13 +838,13 @@ void setStudioEvent(StudioEvent event)
 {
 	switch(impl.mode)
 	{
-	case TIC_CODE_MODE: 	
+	case TIC_CODE_MODE:
 		{
 			Code* code = impl.editor[impl.bank.index.code].code;
 			code->event(code, event); 			
 		}
 		break;
-	case TIC_SPRITE_MODE:	
+	case TIC_SPRITE_MODE:
 		{
 			Sprite* sprite = impl.editor[impl.bank.index.sprites].sprite;
 			sprite->event(sprite, event); 
@@ -1205,12 +1207,11 @@ static bool collabStreamCallback(u8* buffer, s32 size, void* data)
 	memcpy(copy, buffer, size);
 	copy[size] = '\0';
 
-	if(strstr(copy, "sprite") != NULL)
-		impl.collab.changed |= 1 << TIC_COLLAB_SPRITES_CHANGED;
-	if(strstr(copy, "flags") != NULL)
-		impl.collab.changed |= 1 << TIC_COLLAB_FLAGS_CHANGED;
-	if(strstr(copy, "palette") != NULL)
-		impl.collab.changed |= 1 << TIC_COLLAB_PALETTE_CHANGED;
+	//if(strstr(copy, "sprite") != NULL || strstr(copy, "flags") != NULL || strstr(copy, "palette") != NULL)
+	{
+		Sprite* sprite = impl.editor[impl.bank.index.sprites].sprite;
+		sprite->pull(sprite);
+	}
 
 	free(copy);
 
