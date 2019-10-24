@@ -150,6 +150,7 @@ static struct
 
 	struct
 	{
+		char url[FILENAME_MAX];
 		u32 streamCounter;
 		u32 changed;
 	} collab;
@@ -1205,31 +1206,6 @@ bool studioCartChanged()
 	return memcmp(hash.data, impl.cart.hash.data, sizeof(CartHash)) != 0;
 }
 
-void getCollabData(const char* path, void *dest, s32 destSize)
-{
-	char url[256];
-	snprintf(url, sizeof(url), "%s%s", getSystem()->getCollabUrl(), path);
-
-	s32 size;
-	void *buffer = getSystem()->getUrlRequest(url, &size);
-
-	if(buffer)
-	{
-		if(size == destSize)
-			memcpy(dest, buffer, destSize);
-		
-		free(buffer);
-	}
-}
-
-void putCollabData(const char* path, void *data, s32 size)
-{
-	char url[256];
-	snprintf(url, sizeof(url), "%s%s", getSystem()->getCollabUrl(), path);
-
-	getSystem()->putUrlRequest(url, data, size);
-}
-
 static bool collabStreamCallback(u8* buffer, s32 size, void* data)
 {
 	char* copy = malloc(size + 1);
@@ -1258,8 +1234,50 @@ void startCollabStream()
 	impl.collab.streamCounter++;
 
 	char url[1024];
-	snprintf(url, sizeof(url), "%s/watch", getSystem()->getCollabUrl());
+	snprintf(url, sizeof(url), "%s/watch", impl.collab.url);
 	getSystem()->getUrlStream(url, collabStreamCallback, (void*)(uintptr_t)impl.collab.streamCounter);
+}
+
+bool collabEnabled()
+{
+	return impl.collab.url[0] != '\0';
+}
+
+void setCollabUrl(const char* collabUrl)
+{
+	snprintf(impl.collab.url, sizeof(impl.collab.url), "%s", collabUrl);
+
+	startCollabStream();
+}
+
+char* getCollabUrl()
+{
+	return impl.collab.url;
+}
+
+void getCollabData(const char* path, void *dest, s32 destSize)
+{
+	char url[256];
+	snprintf(url, sizeof(url), "%s%s", impl.collab.url, path);
+
+	s32 size;
+	void *buffer = getSystem()->getUrlRequest(url, &size);
+
+	if(buffer)
+	{
+		if(size == destSize)
+			memcpy(dest, buffer, destSize);
+		
+		free(buffer);
+	}
+}
+
+void putCollabData(const char* path, void *data, s32 size)
+{
+	char url[256];
+	snprintf(url, sizeof(url), "%s%s", impl.collab.url, path);
+
+	getSystem()->putUrlRequest(url, data, size);
 }
 
 tic_key* getKeymap()

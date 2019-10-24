@@ -1054,7 +1054,7 @@ static void pullSelectionFromServer(Map* map)
 		s32 expectedSize = sel.w * sel.h;
 
 		char url[256];
-		snprintf(url, sizeof(url), "%s/map/selection?x=%d&y=%d&w=%d&h=%d", getSystem()->getCollabUrl(), sel.x, sel.y, sel.w, sel.h);
+		snprintf(url, sizeof(url), "%s/map/selection?x=%d&y=%d&w=%d&h=%d", getCollabUrl(), sel.x, sel.y, sel.w, sel.h);
 
 		s32 size;
 		u8 *buffer = getSystem()->getUrlRequest(url, &size);
@@ -1075,7 +1075,7 @@ static void pullSelectionFromServer(Map* map)
 
 static void pushToServer(Map *map)
 {
-	if(!getSystem()->getCollabUrl())
+	if(!collabEnabled())
 		return;
 
 	if(map->tic->api.key(map->tic, tic_key_shift))
@@ -1090,7 +1090,7 @@ static void pushToServer(Map *map)
 
 static void pullFromServer(Map *map)
 {
-	if(!getSystem()->getCollabUrl())
+	if(!collabEnabled())
 		return;
 
 	if(map->tic->api.key(map->tic, tic_key_shift))

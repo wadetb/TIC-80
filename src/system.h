@@ -18,9 +18,6 @@ typedef struct
 	u64 	(*getPerformanceCounter)();
 	u64 	(*getPerformanceFrequency)();
 
-	void  (*setCollabUrl)(const char* collabUrl);
-	char* (*getCollabUrl)();
-
 	void* (*getUrlRequest)(const char* url, s32* size);
 	void  (*putUrlRequest)(const char* url, void *data, s32 size);
 

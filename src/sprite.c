@@ -1066,6 +1066,7 @@ static void drawPaletteOvr(Sprite* sprite, s32 x, s32 y)
 		sprite->tic->api.rect_border(sprite->tic, offsetX - 2, offsetY - 2, PALETTE_CELL_SIZE + 3, PALETTE_CELL_SIZE + 3, (tic_color_white));
 	}
 
+	if(collabEnabled())
 	{
 		tic_rgb *mine = sprite->tic->cart.bank0.palette.colors;
 		tic_rgb *server = sprite->server.palette.colors;
@@ -1150,32 +1151,35 @@ static void drawSheetOvr(Sprite* sprite, s32 x, s32 y)
 		for(s32 i = 0; i < rect.w; i += TIC_SPRITESIZE, index++)
 			sprite->tic->api.sprite(sprite->tic, sprite->src, index, x + i, y + j, NULL, 0);
 
-	for(s32 j = 0, index = (sprite->index - sprite->index % TIC_BANK_SPRITES); j < rect.h; j += TIC_SPRITESIZE)
+	if(collabEnabled())
 	{
-		for(s32 i = 0; i < rect.w; i += TIC_SPRITESIZE, index++)
+		for(s32 j = 0, index = (sprite->index - sprite->index % TIC_BANK_SPRITES); j < rect.h; j += TIC_SPRITESIZE)
 		{
-			if(sprite->server.diff[index])
+			for(s32 i = 0; i < rect.w; i += TIC_SPRITESIZE, index++)
 			{
-				u8 left = 0, right = 0, top = 0, bottom = 0;
+				if(sprite->server.diff[index])
+				{
+					u8 left = 0, right = 0, top = 0, bottom = 0;
 
-				s32 bank_index = index % TIC_BANK_SPRITES;
-				if ((bank_index % TIC_SPRITESHEET_COLS) > 0)
-					left = sprite->server.diff[index - 1];
-				if ((bank_index % TIC_SPRITESHEET_COLS) < TIC_SPRITESHEET_COLS - 1)
-					right = sprite->server.diff[index + 1];
-				if (bank_index >= TIC_SPRITESHEET_COLS)
-					top = sprite->server.diff[index - TIC_SPRITESHEET_COLS];
-				if (bank_index < TIC_BANK_SPRITES - TIC_SPRITESHEET_COLS)
-					bottom = sprite->server.diff[index + TIC_SPRITESHEET_COLS];
+					s32 bank_index = index % TIC_BANK_SPRITES;
+					if ((bank_index % TIC_SPRITESHEET_COLS) > 0)
+						left = sprite->server.diff[index - 1];
+					if ((bank_index % TIC_SPRITESHEET_COLS) < TIC_SPRITESHEET_COLS - 1)
+						right = sprite->server.diff[index + 1];
+					if (bank_index >= TIC_SPRITESHEET_COLS)
+						top = sprite->server.diff[index - TIC_SPRITESHEET_COLS];
+					if (bank_index < TIC_BANK_SPRITES - TIC_SPRITESHEET_COLS)
+						bottom = sprite->server.diff[index + TIC_SPRITESHEET_COLS];
 
-				if(!left)
-					sprite->tic->api.line(sprite->tic, x + i, y + j, x + i, y + j + TIC_SPRITESIZE - 1, (tic_color_yellow));
-				if(!right)
-					sprite->tic->api.line(sprite->tic, x + i + TIC_SPRITESIZE - 1, y + j, x + i + TIC_SPRITESIZE - 1, y + j + TIC_SPRITESIZE - 1, (tic_color_yellow));
-				if(!top)
-					sprite->tic->api.line(sprite->tic, x + i, y + j, x + i + TIC_SPRITESIZE - 1, y + j, (tic_color_yellow));
-				if(!bottom)
-					sprite->tic->api.line(sprite->tic, x + i, y + j + TIC_SPRITESIZE - 1, x + i + TIC_SPRITESIZE - 1, y + j + TIC_SPRITESIZE - 1, (tic_color_yellow));
+					if(!left)
+						sprite->tic->api.line(sprite->tic, x + i, y + j, x + i, y + j + TIC_SPRITESIZE - 1, (tic_color_yellow));
+					if(!right)
+						sprite->tic->api.line(sprite->tic, x + i + TIC_SPRITESIZE - 1, y + j, x + i + TIC_SPRITESIZE - 1, y + j + TIC_SPRITESIZE - 1, (tic_color_yellow));
+					if(!top)
+						sprite->tic->api.line(sprite->tic, x + i, y + j, x + i + TIC_SPRITESIZE - 1, y + j, (tic_color_yellow));
+					if(!bottom)
+						sprite->tic->api.line(sprite->tic, x + i, y + j + TIC_SPRITESIZE - 1, x + i + TIC_SPRITESIZE - 1, y + j + TIC_SPRITESIZE - 1, (tic_color_yellow));
+				}
 			}
 		}
 	}
@@ -1560,7 +1564,7 @@ static void pullSpriteSelectionFromServer(Sprite* sprite)
 	s32 expectedSize = tileCount * TIC_SPRITESIZE * TIC_SPRITESIZE * TIC_PALETTE_BPP / BITS_IN_BYTE;
 
 	char url[256];
-	snprintf(url, sizeof(url), "%s/sprite/single?index=%d&size=%d", getSystem()->getCollabUrl(), sprite->index, sprite->size);
+	snprintf(url, sizeof(url), "%s/sprite/single?index=%d&size=%d", getCollabUrl(), sprite->index, sprite->size);
 
 	s32 size;
 	tic_tile *buffer = (tic_tile*)getSystem()->getUrlRequest(url, &size);
@@ -1588,7 +1592,7 @@ static void pullFlagsSelectionFromServer(Sprite* sprite)
 	s32 expectedSize = tileCount;
 
 	char url[256];
-	snprintf(url, sizeof(url), "%s/flags/single?index=%d&size=%d", getSystem()->getCollabUrl(), sprite->index, sprite->size);
+	snprintf(url, sizeof(url), "%s/flags/single?index=%d&size=%d", getCollabUrl(), sprite->index, sprite->size);
 
 	s32 size;
 	u8 *buffer = (u8*)getSystem()->getUrlRequest(url, &size);
@@ -1610,7 +1614,7 @@ static void pullFlagsSelectionFromServer(Sprite* sprite)
 
 static void pushToServer(Sprite* sprite)
 {
-	if(!getSystem()->getCollabUrl())
+	if(!collabEnabled())
 		return;
 
 	if(sprite->tic->api.key(sprite->tic, tic_key_shift))
@@ -1628,7 +1632,7 @@ static void pushToServer(Sprite* sprite)
 
 static void pullFromServer(Sprite* sprite)
 {
-	if(!getSystem()->getCollabUrl())
+	if(!collabEnabled())
 		return;
 
 	if(sprite->tic->api.key(sprite->tic, tic_key_shift))
@@ -1650,23 +1654,26 @@ static void diff(Sprite *sprite)
 {
 	sprite->server.dirty = false;
 
-	tic_tile *serverTiles = sprite->server.tiles.data;
-	tic_tile *myTiles = sprite->src->data;
-
-	u8 *serverFlags = sprite->server.flags.data;
-	u8 *myFlags = sprite->tic->cart.bank0.flags.data;
-
-	for(s32 index = 0; index < TIC_SPRITES; index++)
+	if(collabEnabled())
 	{
-		bool diff = (myFlags[index] != serverFlags[index]) ||
-		            memcmp(&serverTiles[index], &myTiles[index], sizeof(tic_tile)) != 0;
-		sprite->server.diff[index] = diff;
-		if(diff)
+		tic_tile *serverTiles = sprite->server.tiles.data;
+		tic_tile *myTiles = sprite->src->data;
+
+		u8 *serverFlags = sprite->server.flags.data;
+		u8 *myFlags = sprite->tic->cart.bank0.flags.data;
+
+		for(s32 index = 0; index < TIC_SPRITES; index++)
+		{
+			bool diff = (myFlags[index] != serverFlags[index]) ||
+						memcmp(&serverTiles[index], &myTiles[index], sizeof(tic_tile)) != 0;
+			sprite->server.diff[index] = diff;
+			if(diff)
+				sprite->server.dirty = true;
+		}
+
+		if(memcmp(sprite->server.palette.data, sprite->tic->cart.bank0.palette.data, sizeof(tic_palette)) != 0)
 			sprite->server.dirty = true;
 	}
-
-	if(memcmp(sprite->server.palette.data, sprite->tic->cart.bank0.palette.data, sizeof(tic_palette)) != 0)
-		sprite->server.dirty = true;
 }
 
 static void onPull(Sprite *sprite)

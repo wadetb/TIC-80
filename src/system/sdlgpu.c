@@ -102,11 +102,6 @@ static struct
 		const u8* src;
 	} mouse;
 
-	struct
-	{
-		char url[FILENAME_MAX];
-	} collab;
-	
 	Net* net;
 
 	bool missedFrame;
@@ -1235,18 +1230,6 @@ static bool splitUrl(const char *url, URLParts *parts)
 	return true;
 }
 
-static void setCollabUrl(const char* collabUrl)
-{
-	snprintf(platform.collab.url, sizeof(platform.collab.url), "%s", collabUrl);
-}
-
-static char* getCollabUrl()
-{
-	if (platform.collab.url[0] != '\0')
-		return platform.collab.url;
-	else return NULL;
-}
-
 static void* getUrlRequest(const char* url, s32* size)
 {
 	URLParts parts;
@@ -1389,9 +1372,6 @@ static System systemInterface =
 
 	.getPerformanceCounter = getPerformanceCounter,
 	.getPerformanceFrequency = getPerformanceFrequency,
-
-	.setCollabUrl = setCollabUrl,
-	.getCollabUrl = getCollabUrl,
 
 	.getUrlRequest = getUrlRequest,
 	.putUrlRequest = putUrlRequest,

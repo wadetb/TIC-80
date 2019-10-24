@@ -137,7 +137,9 @@ typedef enum
 void setStudioEvent(StudioEvent event);
 void showTooltip(const char* text);
 
-void startCollabStream();
+bool collabEnabled();
+void setCollabUrl(const char* collabUrl);
+char* getCollabUrl();
 void getCollabData(const char* path, void *dest, s32 destSize);
 void putCollabData(const char* path, void *data, s32 size);
 

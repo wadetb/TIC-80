@@ -1533,13 +1533,11 @@ static void onConsoleCollabCommand(Console* console, const char* param)
 		void *buffer = getSystem()->getUrlRequest(param, &size);
 		if(buffer && size)
 		{
-			getSystem()->setCollabUrl(param);
+			setCollabUrl(param);
 
 			char welcome[1024];
 			snprintf(welcome, sizeof(welcome), "\n%.*s", size, (char*)buffer);
 			printFront(console, welcome);
-
-			startCollabStream();
 		}
 		else printBack(console, "\nfailed to connect");
 		if(buffer)
