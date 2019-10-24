@@ -61,8 +61,14 @@ struct Sprite
 
 	struct History* history;
 
-	u8 diff[TIC_SPRITES];
-	u8 palette_diff[TIC_PALETTE_SIZE];
+	struct
+	{
+		u8 diff[TIC_SPRITES];
+		tic_tiles tiles;
+		tic_tiles sprites;
+		tic_flags flags;
+		tic_palette palette;
+	}server;
 	
 	void (*tick)(Sprite*);
 	void (*event)(Sprite*, StudioEvent);

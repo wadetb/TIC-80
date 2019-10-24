@@ -34,7 +34,7 @@ class TIC:
         self.palette = bytearray(b'\0' * TIC_PALETTE_SIZE * TIC_PALETTE_CHANNELS)
 
         self.condition = threading.Condition()
-        self.update_keys = {'sprite': 0}
+        self.update_keys = {'sprite': 0, 'flags': 0, 'palette': 0}
 
     def signal_update(self, key):
         with self.condition:
@@ -44,49 +44,10 @@ class TIC:
     def wait_update(self, keys):
         with self.condition:
             self.condition.wait()
-        return [k for k, v in self.update_keys.items()
-                if keys.get(k, None) != v]
-
-    def set_pixel(self, x, y, color):
-        tile_x = x // TIC_SPRITESIZE
-        tile_y = y // TIC_SPRITESIZE
-        tile_index = tile_y * TIC_SPRITESHEET_COLS + tile_x
-        tile = tic.tiles[tile_index]
-        tile_stride = TIC_SPRITESIZE * TIC_PALETTE_BPP // BITS_IN_BYTE
-        x_in_tile = x - (tile_x * TIC_SPRITESIZE)
-        y_in_tile = y - (tile_y * TIC_SPRITESIZE)
-        tile_offset = y_in_tile * tile_stride + x_in_tile * TIC_PALETTE_BPP // BITS_IN_BYTE
-        if x_in_tile & 1:
-            tile[tile_offset] = (tile[tile_offset] & 0x0f) | (color << 4)
-        else:
-            tile[tile_offset] = (tile[tile_offset] & 0xf0) | color
-
-    def get_pixel(self, x, y):
-        tile_x = x // TIC_SPRITESIZE
-        tile_y = y // TIC_SPRITESIZE
-        tile_index = tile_y * TIC_SPRITESHEET_COLS + tile_x
-        tile = tic.tiles[tile_index]
-        tile_stride = TIC_SPRITESIZE * TIC_PALETTE_BPP // BITS_IN_BYTE
-        x_in_tile = x - (tile_x * TIC_SPRITESIZE)
-        y_in_tile = y - (tile_y * TIC_SPRITESIZE)
-        tile_offset = y_in_tile * tile_stride + x_in_tile * TIC_PALETTE_BPP // BITS_IN_BYTE
-        if x_in_tile & 1:
-            return (tile[tile_offset] >> 4) & 0x0f
-        else:
-            return tile[tile_offset]  & 0x0f
-
-    def set_flag(self, i, flag):
-        self.flags[i] = flag
-    
-    def get_flag(self, i):
-        return self.flags[i]
-
-    def set_palette(self, buffer):
-        self.palette = buffer
-
-    def get_palette(self):
-        return self.palette
-
+            changed = [k for k, v in self.update_keys.items()
+                       if keys.get(k, None) != v]
+            keys.update(self.update_keys)
+        return changed
 
 tic = TIC()
 
@@ -107,15 +68,10 @@ class CollabHandler(http.server.BaseHTTPRequestHandler):
                 changed = tic.wait_update(keys)
                 self.wfile.write('\n'.join(changed).encode())
 
-
         elif self.path.startswith('/sprite/all'):
-            buffer = bytearray(b'\0' * (TIC_SPRITES * TIC_SPRITESIZE * TIC_SPRITESIZE * TIC_PALETTE_BPP // BITS_IN_BYTE))
-
-            for y in range(TIC_SPRITES * TIC_SPRITESIZE * TIC_SPRITESIZE // TIC_SPRITESHEET_SIZE):
-                for x in range(TIC_SPRITESHEET_SIZE):
-                    color = tic.get_pixel(x, y)
-                    buffer_offset = (y * TIC_SPRITESHEET_SIZE + x) * TIC_PALETTE_BPP // BITS_IN_BYTE
-                    buffer[buffer_offset] |= color << (TIC_PALETTE_BPP if x & 1 else 0)
+            buffer = bytearray()
+            for index in range(TIC_SPRITES):
+                buffer.extend(tic.tiles[index])
 
             self.send_response(200)
             self.send_header('Content-Length', '{}'.format(len(buffer)))
@@ -128,15 +84,11 @@ class CollabHandler(http.server.BaseHTTPRequestHandler):
             index = int(query['index'][0])
             size = int(query['size'][0])
 
-            buffer = bytearray(b'\0' * (size * size * TIC_PALETTE_BPP // BITS_IN_BYTE))
-
-            start_y, start_x = divmod(index, TIC_SPRITESHEET_COLS)
-
-            for y in range(size):
-                for x in range(size):                  
-                    color = tic.get_pixel(start_x * TIC_SPRITESIZE + x, start_y * TIC_SPRITESIZE + y)
-                    buffer_offset = (y * size + x) * TIC_PALETTE_BPP // BITS_IN_BYTE
-                    buffer[buffer_offset] |= color << (TIC_PALETTE_BPP if x & 1 else 0)
+            size_in_tiles = size // TIC_SPRITESIZE
+            buffer = bytearray()
+            for y in range(size_in_tiles):
+                for x in range(size_in_tiles):
+                    buffer.extend(tic.tiles[index + y * TIC_SPRITESHEET_COLS + x])
 
             self.send_response(200)
             self.send_header('Content-Length', '{}'.format(len(buffer)))
@@ -157,13 +109,10 @@ class CollabHandler(http.server.BaseHTTPRequestHandler):
             size = int(query['size'][0])
 
             size_in_tiles = size // TIC_SPRITESIZE
-            buffer = bytearray(b'\0' * (size_in_tiles * size_in_tiles))
-
-            tile_y, tile_x = divmod(index, TIC_SPRITESHEET_COLS)
-            
+            buffer = bytearray()
             for y in range(size_in_tiles):
                 for x in range(size_in_tiles):
-                    buffer[y * size_in_tiles + x] = tic.get_flag((tile_y + y) * TIC_SPRITESHEET_COLS + (tile_x + x))
+                    buffer.append(tic.flags[index + y * TIC_SPRITESHEET_COLS + x])
 
             self.send_response(200)
             self.send_header('Content-Length', '{}'.format(len(buffer)))
@@ -172,13 +121,11 @@ class CollabHandler(http.server.BaseHTTPRequestHandler):
             self.wfile.write(buffer)
 
         elif self.path.startswith('/palette'):
-            buffer = tic.get_palette()
-
             self.send_response(200)
-            self.send_header('Content-Length', '{}'.format(len(buffer)))
+            self.send_header('Content-Length', '{}'.format(TIC_PALETTE_SIZE * TIC_PALETTE_CHANNELS))
             self.end_headers()
 
-            self.wfile.write(buffer)
+            self.wfile.write(tic.palette)
 
         else:
             self.send_response(400)
@@ -186,13 +133,9 @@ class CollabHandler(http.server.BaseHTTPRequestHandler):
 
     def do_PUT(self):
         if self.path.startswith('/sprite/all'):
-            buffer = self.rfile.read(TIC_SPRITES * TIC_SPRITESIZE * TIC_SPRITESIZE * TIC_PALETTE_BPP // BITS_IN_BYTE)
-
-            for y in range(TIC_SPRITES * TIC_SPRITESIZE * TIC_SPRITESIZE // TIC_SPRITESHEET_SIZE):
-                for x in range(TIC_SPRITESHEET_SIZE):
-                    buffer_offset = (y * TIC_SPRITESHEET_SIZE + x) * TIC_PALETTE_BPP // BITS_IN_BYTE
-                    color = (buffer[buffer_offset] >> (TIC_PALETTE_BPP if x & 1 else 0)) & 0x0f
-                    tic.set_pixel(x, y, color)
+            for index in range(TIC_SPRITES):
+                tile = self.rfile.read(TIC_SPRITESIZE * TIC_SPRITESIZE * TIC_PALETTE_BPP // BITS_IN_BYTE)
+                tic.tiles[index] = tile
 
             tic.signal_update('sprite')
 
@@ -204,15 +147,11 @@ class CollabHandler(http.server.BaseHTTPRequestHandler):
             index = int(query['index'][0])
             size = int(query['size'][0])
 
-            buffer = self.rfile.read(size * size * TIC_PALETTE_BPP // BITS_IN_BYTE)
-
-            tile_y, tile_x = divmod(index, TIC_SPRITESHEET_COLS)
-            
-            for y in range(size):
-                for x in range(size):
-                    buffer_offset = (y * size + x) * TIC_PALETTE_BPP // BITS_IN_BYTE
-                    color = (buffer[buffer_offset] >> (TIC_PALETTE_BPP if x & 1 else 0)) & 0x0f
-                    tic.set_pixel(tile_x * TIC_SPRITESIZE + x, tile_y * TIC_SPRITESIZE + y, color)
+            size_in_tiles = size // TIC_SPRITESIZE
+            for y in range(size_in_tiles):
+                for x in range(size_in_tiles):
+                    tile = self.rfile.read(TIC_SPRITESIZE * TIC_SPRITESIZE * TIC_PALETTE_BPP // BITS_IN_BYTE)
+                    tic.tiles[index + y * TIC_SPRITESHEET_COLS + x] = tile
 
             tic.signal_update('sprite')
 
@@ -220,12 +159,9 @@ class CollabHandler(http.server.BaseHTTPRequestHandler):
             self.end_headers()
 
         elif self.path.startswith('/flags/all'):
-            buffer = self.rfile.read(TIC_FLAGS)
+            tic.flags = bytearray(self.rfile.read(TIC_FLAGS))
 
-            for i in range(TIC_FLAGS):
-                tic.set_flag(i, buffer[i])
-
-            tic.signal_update('sprite')
+            tic.signal_update('flags')
 
             self.send_response(200)
             self.end_headers()
@@ -236,24 +172,20 @@ class CollabHandler(http.server.BaseHTTPRequestHandler):
             size = int(query['size'][0])
 
             size_in_tiles = size // TIC_SPRITESIZE
-            buffer = self.rfile.read(size_in_tiles * size_in_tiles)
-
-            tile_y, tile_x = divmod(index, TIC_SPRITESHEET_COLS)
-            
             for y in range(size_in_tiles):
                 for x in range(size_in_tiles):
-                    tic.set_flag((tile_y + y) * TIC_SPRITESHEET_COLS + (tile_x + x), buffer[y * size_in_tiles + x])
+                    flag = self.rfile.read(1)[0]
+                    tic.flags[index + y * TIC_SPRITESHEET_COLS + x] = flag
 
-            tic.signal_update('sprite')
+            tic.signal_update('flags')
 
             self.send_response(200)
             self.end_headers()
 
         elif self.path.startswith('/palette'):
-            buffer = self.rfile.read(TIC_PALETTE_SIZE * TIC_PALETTE_CHANNELS)
-            tic.set_palette(buffer)
+            tic.palette = bytearray(self.rfile.read(TIC_PALETTE_SIZE * TIC_PALETTE_CHANNELS))
 
-            tic.signal_update('sprite')
+            tic.signal_update('palette')
 
             self.send_response(200)
             self.end_headers()

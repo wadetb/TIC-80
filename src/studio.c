@@ -150,6 +150,12 @@ static struct
 
 	struct
 	{
+		u32 streamCounter;
+		u32 changed;
+	} collab;
+
+	struct
+	{
 		Code* 	code;
 		Sprite* sprite;
 		Map* 	map;
@@ -749,6 +755,15 @@ void drawToolbar(tic_mem* tic, u8 color, bool bg)
 
 	static const char* Tips[] = {"CODE EDITOR [f1]", "SPRITE EDITOR [f2]", "MAP EDITOR [f3]", "SFX EDITOR [f4]", "MUSIC EDITOR [f5]",};
 
+	static u32 ChangeMasks[] = 
+	{
+		0, 
+		TIC_COLLAB_SPRITES_CHANGED | TIC_COLLAB_FLAGS_CHANGED | TIC_COLLAB_PALETTE_CHANGED, 
+		0,
+		0,
+		0,
+	};
+
 	s32 mode = -1;
 
 	for(s32 i = 0; i < COUNT_OF(Modes); i++)
@@ -777,7 +792,13 @@ void drawToolbar(tic_mem* tic, u8 color, bool bg)
 		if(mode == i)
 			drawBitIcon(i * Size, 1, Icons + i * BITS_IN_BYTE, tic_color_black);
 
-		drawBitIcon(i * Size, 0, Icons + i * BITS_IN_BYTE, mode == i ? (tic_color_white) : (over ? (tic_color_dark_gray) : (tic_color_light_blue)));
+		u8 icon = 
+			(impl.collab.changed & ChangeMasks[i]) ? tic_color_yellow :
+			(mode == i) ? tic_color_white :
+			over ? tic_color_dark_gray :
+			tic_color_light_blue;
+
+		drawBitIcon(i * Size, 0, Icons + i * BITS_IN_BYTE, icon);
 	}
 
 	if(mode >= 0) drawExtrabar(tic);
@@ -1176,6 +1197,49 @@ bool studioCartChanged()
 	md5(&impl.studio.tic->cart, sizeof(tic_cartridge), hash.data);
 
 	return memcmp(hash.data, impl.cart.hash.data, sizeof(CartHash)) != 0;
+}
+
+static bool collabStreamCallback(u8* buffer, s32 size, void* data)
+{
+	char* copy = malloc(size + 1);
+	memcpy(copy, buffer, size);
+	copy[size] = '\0';
+
+	if(strstr(copy, "sprite") != NULL)
+		impl.collab.changed |= 1 << TIC_COLLAB_SPRITES_CHANGED;
+	if(strstr(copy, "flags") != NULL)
+		impl.collab.changed |= 1 << TIC_COLLAB_FLAGS_CHANGED;
+	if(strstr(copy, "palette") != NULL)
+		impl.collab.changed |= 1 << TIC_COLLAB_PALETTE_CHANGED;
+
+	free(copy);
+
+	return impl.collab.streamCounter == (s32)(uintptr_t)data;
+}
+
+void startCollabStream()
+{
+	impl.collab.streamCounter++;
+
+	char url[1024];
+	snprintf(url, sizeof(url), "%s/watch", getSystem()->getCollabUrl());
+	getSystem()->getUrlStream(url, collabStreamCallback, (void*)(uintptr_t)impl.collab.streamCounter);
+}
+
+bool checkCollabEvent(CollabEvent event)
+{
+	u32 bit = 1 << event;
+	if(impl.collab.changed & bit)
+	{
+		impl.collab.changed &= ~bit;
+		return true;
+	} else return false;
+}
+
+bool peekCollabEvent(CollabEvent event)
+{
+	u32 bit = 1 << event;
+	return (impl.collab.changed & bit) != 0;
 }
 
 tic_key* getKeymap()

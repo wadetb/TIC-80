@@ -39,9 +39,6 @@ struct Net
 	} cache;
 };
 
-
-typedef bool(*NetResponse)(u8* buffer, s32 size, void* data);
-
 #if defined(__EMSCRIPTEN__)
 
 static void getRequest(Net* net, const char* path, NetResponse callback, void* data)
@@ -71,7 +68,7 @@ typedef struct
 	s32 size;
 	s32 timeout;
 	NetResponse streamCallback;
-	void *streamCallbackData;
+	void *streamData;
 }Request;
 
 typedef struct
@@ -158,7 +155,7 @@ static Response httpRequest(Request* req)
 								{
 									if(req->streamCallback)
 									{
-										bool wantMore = req->streamCallback(res.header + streamOffset, responseSize - streamOffset, req->streamCallbackData);
+										bool wantMore = req->streamCallback(res.header + streamOffset, responseSize - streamOffset, req->streamData);
 										if(!wantMore)
 											break;
 										streamOffset = responseSize;
@@ -198,7 +195,8 @@ static void getRequest(Net* net, const char *host, u16 port, const char* path, N
 
 		bool done = false;
 
-		Request req = {
+		Request req =
+		{
 			.host = host,
 			.port = port,
 			.method = "GET",
@@ -230,13 +228,14 @@ static void getRequest(Net* net, const char *host, u16 port, const char* path, N
 	}
 }
 
-static void putRequest(Net* net, const char *host, u16 port, const char* path, void* data, s32 dataSize, NetResponse callback)
+static void putRequest(Net* net, const char *host, u16 port, const char* path, void* data, s32 dataSize)
 {
 	netClearCache(net);
 
 	bool done = false;
 
-	Request req = {
+	Request req =
+	{
 		.host = host,
 		.port = port,
 		.method = "PUT",
@@ -248,18 +247,7 @@ static void putRequest(Net* net, const char *host, u16 port, const char* path, v
 	Response res = httpRequest(&req);
 
 	if(res.header)
-	{
-		if(strstr(res.header, "200 OK"))
-		{
-			callback(res.content, res.contentLength, data);
-			done = true;
-		}
-
 		free(res.header);
-	}
-
-	if(!done)
-		callback(NULL, 0, data);
 }
 
 #endif
@@ -289,57 +277,66 @@ void* netGetRequest(Net* net, const char *host, u16 port, const char* path, s32*
 	return netGetData.buffer;
 }
 
-static bool onPutResponse(u8* buffer, s32 size, void* data)
-{
-	return true;
-}
-
 void netPutRequest(Net* net, const char *host, u16 port, const char* path, void *data, s32 size)
 {
-	putRequest(net, host, port, path, data, size, onPutResponse);
+	putRequest(net, host, port, path, data, size);
 }
 
 typedef struct
 {
+	bool cancel;
 	Net *net;
-	s32 counter;
 	Request req;
+	NetResponse callback;
+	void* data;
 }NetStreamData;
 
 bool netStreamCallback(u8* buffer, s32 size, void* data)
 {
 	NetStreamData* stream = (NetStreamData*)data;
 
-	printf("%.*s", size, (char*)buffer);
+	if(stream->callback)
+	{
+		if(!stream->callback(buffer, size, stream->data))
+		{
+			stream->cancel = true;
+			return false;
+		}
+	}
 
-	return stream->net->streamCounter == stream->counter;
+	return true;
 }
 
 int SDLCALL netStreamThread(void *data)
 {
 	NetStreamData* stream = (NetStreamData*)data;
 
-	while(stream->net->streamCounter == stream->counter)
+	while(!stream->cancel)
 		httpRequest(&stream->req);
 }
 
-void netGetStream(Net* net, const char *host, u16 port, const char* path)
+void netGetStream(Net* net, const char *host, u16 port, const char* path, NetResponse callback, void* data)
 {
 	NetStreamData* stream = (NetStreamData*)malloc(sizeof(NetStreamData));
 
-	net->streamCounter++; // Any prior stream thread will now exit gracefully
+	*stream = (NetStreamData)
+	{
+		.net = net,
+		.cancel = false,
 
-	stream->net = net;
-	stream->counter = net->streamCounter;
+		.req = (Request)
+		{
+			.host = host,
+			.port = port,
+			.method = "GET",
+			.path = path,
+			.timeout = 3000,
+			.streamCallback = netStreamCallback,
+			.streamData = stream,
+		},
 
-	stream->req = (Request){
-		.host = host,
-		.port = port,
-		.method = "GET",
-		.path = path,
-		.timeout = 3000,
-		.streamCallback = netStreamCallback,
-		.streamCallbackData = stream,
+		.callback = callback,
+		.data = data
 	};
 
 	SDL_Thread *thread = SDL_CreateThread(netStreamThread, "stream thread", stream);

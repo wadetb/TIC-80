@@ -1066,10 +1066,14 @@ static void drawPaletteOvr(Sprite* sprite, s32 x, s32 y)
 		sprite->tic->api.rect_border(sprite->tic, offsetX - 2, offsetY - 2, PALETTE_CELL_SIZE + 3, PALETTE_CELL_SIZE + 3, (tic_color_white));
 	}
 
-	for(s32 row = 0, i = 0; row < PALETTE_ROWS; row++)
-		for(s32 col = 0; col < PALETTE_COLS; col++)
-			if(sprite->palette_diff[i++])
-				sprite->tic->api.rect_border(sprite->tic, x + col * PALETTE_CELL_SIZE, y + row * PALETTE_CELL_SIZE, PALETTE_CELL_SIZE-1, PALETTE_CELL_SIZE-1, (tic_color_yellow));
+	{
+		tic_rgb *mine = sprite->tic->cart.bank0.palette.colors;
+		tic_rgb *server = sprite->server.palette.colors;
+		for(s32 row = 0, i = 0; row < PALETTE_ROWS; row++)
+			for(s32 col = 0; col < PALETTE_COLS; col++, i++)
+				if(memcmp(&mine[i], &server[i], sizeof(tic_rgb)))
+					sprite->tic->api.rect_border(sprite->tic, x + col * PALETTE_CELL_SIZE, y + row * PALETTE_CELL_SIZE, PALETTE_CELL_SIZE-1, PALETTE_CELL_SIZE-1, (tic_color_yellow));
+	}
 
 	{
 		static const u8 Icon[] =
@@ -1138,6 +1142,20 @@ static void drawSheet(Sprite* sprite, s32 x, s32 y)
 	}
 }
 
+static void diffSheet(Sprite *sprite)
+{
+	memset(sprite->server.diff, 0, TIC_SPRITES);
+
+	for(s32 index = 0; index < TIC_SPRITES; index++)
+	{
+		tic_tile *server = &sprite->server.tiles.data[index];
+		tic_tile *mine = &sprite->src->data[index];
+
+		if(memcmp(server, mine, sizeof(tic_tile)))
+			sprite->server.diff[index] = 1;
+	}
+}
+
 static void drawSheetOvr(Sprite* sprite, s32 x, s32 y)
 {
 	tic_rect rect = {x, y, TIC_SPRITESHEET_SIZE, TIC_SPRITESHEET_SIZE};
@@ -1146,23 +1164,25 @@ static void drawSheetOvr(Sprite* sprite, s32 x, s32 y)
 		for(s32 i = 0; i < rect.w; i += TIC_SPRITESIZE, index++)
 			sprite->tic->api.sprite(sprite->tic, sprite->src, index, x + i, y + j, NULL, 0);
 
+	diffSheet(sprite);
+
 	for(s32 j = 0, index = (sprite->index - sprite->index % TIC_BANK_SPRITES); j < rect.h; j += TIC_SPRITESIZE)
 	{
 		for(s32 i = 0; i < rect.w; i += TIC_SPRITESIZE, index++)
 		{
-			if(sprite->diff[index])
+			if(sprite->server.diff[index])
 			{
 				u8 left = 0, right = 0, top = 0, bottom = 0;
 
 				s32 bank_index = index % TIC_BANK_SPRITES;
 				if ((bank_index % TIC_SPRITESHEET_COLS) > 0)
-					left = sprite->diff[index - 1];
+					left = sprite->server.diff[index - 1];
 				if ((bank_index % TIC_SPRITESHEET_COLS) < TIC_SPRITESHEET_COLS - 1)
-					right = sprite->diff[index + 1];
+					right = sprite->server.diff[index + 1];
 				if (bank_index >= TIC_SPRITESHEET_COLS)
-					top = sprite->diff[index - TIC_SPRITESHEET_COLS];
+					top = sprite->server.diff[index - TIC_SPRITESHEET_COLS];
 				if (bank_index < TIC_BANK_SPRITES - TIC_SPRITESHEET_COLS)
-					bottom = sprite->diff[index + TIC_SPRITESHEET_COLS];
+					bottom = sprite->server.diff[index + TIC_SPRITESHEET_COLS];
 
 				if(!left)
 					sprite->tic->api.line(sprite->tic, x + i, y + j, x + i, y + j + TIC_SPRITESIZE - 1, (tic_color_yellow));
@@ -1500,233 +1520,129 @@ static void copyFromClipboard(Sprite* sprite)
 	}
 }
 
-static void diffSpritesWithServer(Sprite* sprite)
+static void getCollabData(const char* path, void *dest, s32 destSize)
 {
-	s32 expectedSize = TIC_SPRITES * TIC_SPRITESIZE * TIC_SPRITESIZE * TIC_PALETTE_BPP / BITS_IN_BYTE;
-
 	char url[256];
-	snprintf(url, sizeof(url), "%s/sprite/all", getSystem()->getCollabUrl());
+	snprintf(url, sizeof(url), "%s%s", getSystem()->getCollabUrl(), path);
 
 	s32 size;
 	void *buffer = getSystem()->getUrlRequest(url, &size);
 
 	if(buffer)
 	{
-		if(size == expectedSize)
-		{
-			for(s32 y = 0, i = 0; y < TIC_SPRITES * TIC_SPRITESIZE * TIC_SPRITESIZE / TIC_SPRITESHEET_SIZE; y++)
-			{
-				for(s32 x = 0; x < TIC_SPRITESHEET_SIZE; x++)
-				{
-					u8 server = tic_tool_peek4(buffer, i++);
-					u8 mine = getSpritePixel(sprite->src->data, x, y);
-					if(server != mine)
-						sprite->diff[(y / TIC_SPRITESIZE) * TIC_SPRITESHEET_COLS + (x / TIC_SPRITESIZE)] = 1;
-				}
-			}
-		}
+		if(size == destSize)
+			memcpy(dest, buffer, destSize);
 		
 		free(buffer);
 	}
 }
 
-static void diffFlagsWithServer(Sprite* sprite)
+static void putCollabData(const char* path, void *data, s32 size)
 {
 	char url[256];
-	snprintf(url, sizeof(url), "%s/flags/all", getSystem()->getCollabUrl());
+	snprintf(url, sizeof(url), "%s%s", getSystem()->getCollabUrl(), path);
 
-	s32 size;
-	u8 *buffer = getSystem()->getUrlRequest(url, &size);
-
-	if(buffer)
-	{
-		if(size == TIC_FLAGS)
-		{
-			tic_flags *flags = getBankFlags();
-	
-			for(s32 y = 0, i = 0; y < TIC_FLAGS / TIC_SPRITESHEET_COLS; y++)
-			{
-				for(s32 x = 0; x < TIC_SPRITESHEET_COLS; x++)
-				{
-					u8 server = buffer[i++];
-					u8 mine = flags->data[y * TIC_SPRITESHEET_COLS + x];
-					if(server != mine)
-						sprite->diff[y * TIC_SPRITESHEET_COLS + x] = 1;
-				}
-			}
-		}
-		
-		free(buffer);
-	}
+	getSystem()->putUrlRequest(url, data, size);
 }
 
-static void diffPaletteWithServer(Sprite* sprite)
+static void checkForServerUpdates(Sprite *sprite)
 {
-	char url[256];
-	snprintf(url, sizeof(url), "%s/palette", getSystem()->getCollabUrl());
-
-	s32 size;
-	tic_palette *buffer = getSystem()->getUrlRequest(url, &size);
-
-	if(buffer)
-	{
-		if(size == TIC_PALETTE_SIZE * sizeof(tic_rgb))
-		{
-			tic_palette *palette = getBankPalette();
-	
-			for(s32 i = 0; i < TIC_PALETTE_SIZE; i++)
-			{
-				tic_rgb server = buffer->colors[i];
-				tic_rgb mine = palette->colors[i];
-				if(server.r != mine.r || server.g != mine.g || server.b != mine.b)
-					sprite->palette_diff[i] = 1;
-			}
-		}
-		
-		free(buffer);
-	}
-}
-
-static void diffWithServer(Sprite *sprite)
-{
-	memset(sprite->diff, 0, TIC_SPRITES);
-	memset(sprite->palette_diff, 0, TIC_PALETTE_SIZE);
-
 	char* collabUrl = getSystem()->getCollabUrl();
 	if(!collabUrl)
 		return;
 
-	diffSpritesWithServer(sprite);
-	diffFlagsWithServer(sprite);
-	diffPaletteWithServer(sprite);
+	if (checkCollabEvent(TIC_COLLAB_SPRITES_CHANGED))
+		getCollabData("/sprite/all", &sprite->server.tiles, sizeof(tic_tiles) * TIC_SPRITE_BANKS);
+
+	if (checkCollabEvent(TIC_COLLAB_FLAGS_CHANGED))
+		getCollabData("/flags/all", &sprite->server.flags, sizeof(tic_flags));
+
+	if (checkCollabEvent(TIC_COLLAB_PALETTE_CHANGED))
+		getCollabData("/palette", &sprite->server.palette, sizeof(tic_palette));
 }
 
-static void pushSelectedSpritesToServer(Sprite* sprite)
+static void pushSpriteSelectionToServer(Sprite* sprite)
 {
-	s32 size = sprite->size * sprite->size * TIC_PALETTE_BPP / BITS_IN_BYTE;
-	u8* buffer = malloc(size);
+	s32 sizeInTiles = sprite->size / TIC_SPRITESIZE;
+	s32 tileCount = sizeInTiles * sizeInTiles;
+
+	s32 size = tileCount * TIC_SPRITESIZE * TIC_SPRITESIZE * TIC_PALETTE_BPP / BITS_IN_BYTE;
+	tic_tile* buffer = (tic_tile*)malloc(size);
 
 	if(buffer)
 	{
-		tic_rect rect = getSpriteRect(sprite);
-		s32 r = rect.x + rect.w;
-		s32 b = rect.y + rect.h;
+		tic_tile *src = sprite->src->data + sprite->index;
 
-		for(s32 y = rect.y, i = 0; y < b; y++)
-			for(s32 x = rect.x; x < r; x++)
-				tic_tool_poke4(buffer, i++, getSheetPixel(sprite, x, y) & 0xf);
+		for(s32 y = 0, i = 0; y < sizeInTiles; y++)
+			for (s32 x = 0; x < sizeInTiles; x++)
+				buffer[i++] = src[y * TIC_SPRITESHEET_COLS + x];
 
 		char url[256];
-		snprintf(url, sizeof(url), "%s/sprite/single?index=%d&size=%d", getSystem()->getCollabUrl(), sprite->index, sprite->size);
-		getSystem()->putUrlRequest(url, buffer, size);
+		snprintf(url, sizeof(url), "/sprite/single?index=%d&size=%d", sprite->index, sprite->size);
+		putCollabData(url, buffer, size);
 
 		free(buffer);
 	}
 }
 
-static void pullSelectedSpritesFromServer(Sprite* sprite)
+static void pushFlagsSelectionToServer(Sprite* sprite)
 {
-	s32 expectedSize = sprite->size * sprite->size * TIC_PALETTE_BPP / BITS_IN_BYTE;
+	s32 sizeInTiles = sprite->size / TIC_SPRITESIZE;
+	s32 tileCount = sizeInTiles * sizeInTiles;
+
+	s32 size = tileCount;
+	u8* buffer = (u8*)malloc(size);
+
+	if(buffer)
+	{
+		u8 *src = sprite->tic->cart.bank0.flags.data + sprite->index;
+
+		for(s32 y = 0, i = 0; y < sizeInTiles; y++)
+			for (s32 x = 0; x < sizeInTiles; x++)
+				buffer[i++] = src[y * TIC_SPRITESHEET_COLS + x];
+
+		char url[256];
+		snprintf(url, sizeof(url), "/flags/single?index=%d&size=%d", sprite->index, sprite->size);
+		putCollabData(url, buffer, size);
+
+		free(buffer);
+	}
+}
+
+static void pullSpriteSelectionFromServer(Sprite* sprite)
+{
+	s32 tileSize = sprite->size / TIC_SPRITESIZE;
+	s32 tileCount = tileSize * tileSize;
+
+	s32 expectedSize = tileCount * TIC_SPRITESIZE * TIC_SPRITESIZE * TIC_PALETTE_BPP / BITS_IN_BYTE;
 
 	char url[256];
 	snprintf(url, sizeof(url), "%s/sprite/single?index=%d&size=%d", getSystem()->getCollabUrl(), sprite->index, sprite->size);
 
 	s32 size;
-	void *buffer = getSystem()->getUrlRequest(url, &size);
+	tic_tile *buffer = getSystem()->getUrlRequest(url, &size);
 
 	if(buffer)
 	{
 		if(size == expectedSize)
 		{
-			tic_rect rect = getSpriteRect(sprite);
-			s32 r = rect.x + rect.w;
-			s32 b = rect.y + rect.h;
+			tic_tile *dest = sprite->src->data + sprite->index;
 
-			for(s32 y = rect.y, i = 0; y < b; y++)
-				for(s32 x = rect.x; x < r; x++)
-					setSheetPixel(sprite, x, y, tic_tool_peek4(buffer, i++));
-
-			history_add(sprite->history);
+			for(s32 y = 0, i = 0; y < tileSize; y++)
+				for (s32 x = 0; x < tileSize; x++)
+					dest[y * TIC_SPRITESHEET_COLS + x] = buffer[i++];
 		}
 		
 		free(buffer);
 	}
 }
 
-static void pushAllSpritesToServer(Sprite* sprite)
+static void pullFlagsSelectionFromServer(Sprite* sprite)
 {
-	s32 size = TIC_SPRITES * TIC_SPRITESIZE * TIC_SPRITESIZE * TIC_PALETTE_BPP / BITS_IN_BYTE;
-	u8* buffer = malloc(size);
+	s32 tileSize = sprite->size / TIC_SPRITESIZE;
+	s32 tileCount = tileSize * tileSize;
 
-	if(buffer)
-	{
-		for(s32 y = 0, i = 0; y < TIC_SPRITES * TIC_SPRITESIZE * TIC_SPRITESIZE / TIC_SPRITESHEET_SIZE; y++)
-			for(s32 x = 0; x < TIC_SPRITESHEET_SIZE; x++)
-				tic_tool_poke4(buffer, i++, getSpritePixel(sprite->src->data, x, y));
-
-		char url[256];
-		snprintf(url, sizeof(url), "%s/sprite/all", getSystem()->getCollabUrl());
-		getSystem()->putUrlRequest(url, buffer, size);
-
-		free(buffer);
-	}
-}
-
-static void pullAllSpritesFromServer(Sprite* sprite)
-{
-	s32 expectedSize = TIC_SPRITES * TIC_SPRITESIZE * TIC_SPRITESIZE * TIC_PALETTE_BPP / BITS_IN_BYTE;
-
-	char url[256];
-	snprintf(url, sizeof(url), "%s/sprite/all", getSystem()->getCollabUrl());
-
-	s32 size;
-	void *buffer = getSystem()->getUrlRequest(url, &size);
-
-	if(buffer)
-	{
-		if(size == expectedSize)
-		{
-			for(s32 y = 0, i = 0; y < TIC_SPRITES * TIC_SPRITESIZE * TIC_SPRITESIZE / TIC_SPRITESHEET_SIZE; y++)
-				for(s32 x = 0; x < TIC_SPRITESHEET_SIZE; x++)
-					setSpritePixel(sprite->src->data, x, y, tic_tool_peek4(buffer, i++));
-
-			history_add(sprite->history);
-		}
-		
-		free(buffer);
-	}
-}
-
-static void pushSelectedFlagsToServer(Sprite* sprite)
-{
-	s32 size = (sprite->size * sprite->size) / (TIC_SPRITESIZE * TIC_SPRITESIZE);
-	u8* buffer = malloc(size);
-
-	if(buffer)
-	{
-		tic_rect rect = getSpriteRect(sprite);
-		s32 l = rect.x / TIC_SPRITESIZE;
-		s32 t = rect.y / TIC_SPRITESIZE;
-		s32 r = (rect.x + rect.w) / TIC_SPRITESIZE;
-		s32 b = (rect.y + rect.h) / TIC_SPRITESIZE;
-
-		tic_flags *flags = getBankFlags();
-
-		for(s32 y = t, i = 0; y < b; y++)
-			for(s32 x = l; x < r; x++)
-				buffer[i++] = flags->data[y * TIC_SPRITESHEET_COLS + x];
-
-		char url[256];
-		snprintf(url, sizeof(url), "%s/flags/single?index=%d&size=%d", getSystem()->getCollabUrl(), sprite->index, sprite->size);
-		getSystem()->putUrlRequest(url, buffer, size);
-
-		free(buffer);
-	}
-}
-
-static void pullSelectedFlagsFromServer(Sprite* sprite)
-{
-	s32 expectedSize = (sprite->size * sprite->size) / (TIC_SPRITESIZE * TIC_SPRITESIZE);
+	s32 expectedSize = tileCount;
 
 	char url[256];
 	snprintf(url, sizeof(url), "%s/flags/single?index=%d&size=%d", getSystem()->getCollabUrl(), sprite->index, sprite->size);
@@ -1738,74 +1654,12 @@ static void pullSelectedFlagsFromServer(Sprite* sprite)
 	{
 		if(size == expectedSize)
 		{
-			tic_rect rect = getSpriteRect(sprite);
-			s32 l = rect.x / TIC_SPRITESIZE;
-			s32 t = rect.y / TIC_SPRITESIZE;
-			s32 r = (rect.x + rect.w) / TIC_SPRITESIZE;
-			s32 b = (rect.y + rect.h) / TIC_SPRITESIZE;
+			u8 *dest = sprite->tic->cart.bank0.flags.data + sprite->index;
 
-			tic_flags *flags = getBankFlags();
-
-			for(s32 y = t, i = 0; y < b; y++)
-				for(s32 x = l; x < r; x++)
-					flags->data[y * TIC_SPRITESHEET_COLS + x] = buffer[i++];
-
-			history_add(sprite->history);
+			for(s32 y = 0, i = 0; y < tileSize; y++)
+				for (s32 x = 0; x < tileSize; x++)
+					dest[y * TIC_SPRITESHEET_COLS + x] = buffer[i++];
 		}
-		
-		free(buffer);
-	}
-}
-
-static void pushAllFlagsToServer(Sprite* sprite)
-{
-	tic_flags *flags = getBankFlags();
-
-	char url[256];
-	snprintf(url, sizeof(url), "%s/flags/all", getSystem()->getCollabUrl());
-	getSystem()->putUrlRequest(url, flags->data, TIC_FLAGS);
-}
-
-static void pullAllFlagsFromServer(Sprite* sprite)
-{
-	char url[256];
-	snprintf(url, sizeof(url), "%s/flags/all", getSystem()->getCollabUrl());
-
-	s32 size;
-	void *buffer = getSystem()->getUrlRequest(url, &size);
-
-	if(buffer)
-	{
-		if(size == TIC_FLAGS)
-		{
-			tic_flags *flags = getBankFlags();
-			memcpy(flags->data, buffer, TIC_FLAGS);
-			history_add(sprite->history);
-		}
-		
-		free(buffer);
-	}
-}
-
-static void pushPaletteToServer(Sprite* sprite)
-{
-	char url[256];
-	snprintf(url, sizeof(url), "%s/palette", getSystem()->getCollabUrl());
-	getSystem()->putUrlRequest(url, getBankPalette()->colors, TIC_PALETTE_SIZE * sizeof(tic_rgb));
-}
-
-static void pullPaletteFromServer(Sprite* sprite)
-{
-	char url[256];
-	snprintf(url, sizeof(url), "%s/palette", getSystem()->getCollabUrl());
-
-	s32 size;
-	void *buffer = getSystem()->getUrlRequest(url, &size);
-
-	if(buffer)
-	{
-		if(size == TIC_PALETTE_SIZE * sizeof(tic_rgb))
-			memcpy(getBankPalette()->colors, buffer, TIC_PALETTE_SIZE * sizeof(tic_rgb));
 		
 		free(buffer);
 	}
@@ -1818,14 +1672,14 @@ static void pushToServer(Sprite* sprite)
 
 	if(sprite->tic->api.key(sprite->tic, tic_key_shift))
 	{
-		pushAllSpritesToServer(sprite);
-		pushAllFlagsToServer(sprite);
-		pushPaletteToServer(sprite);
+		putCollabData("/sprite/all", sprite->src->data, sizeof(tic_tiles) * TIC_SPRITE_BANKS);
+		putCollabData("/flags/all", sprite->tic->cart.bank0.flags.data, sizeof(tic_flags));
+		putCollabData("/palette/all", sprite->tic->cart.bank0.palette.data, sizeof(tic_palette));
 	}
 	else
 	{
-		pushSelectedSpritesToServer(sprite);
-		pushSelectedFlagsToServer(sprite);
+		pushSpriteSelectionToServer(sprite);
+		pushFlagsSelectionToServer(sprite);
 	}
 }
 
@@ -1836,15 +1690,17 @@ static void pullFromServer(Sprite* sprite)
 
 	if(sprite->tic->api.key(sprite->tic, tic_key_shift))
 	{
-		pullAllSpritesFromServer(sprite);
-		pullAllFlagsFromServer(sprite);
-		pullPaletteFromServer(sprite);
+		getCollabData("/sprite/all", sprite->src->data, sizeof(tic_tiles) * TIC_SPRITE_BANKS);
+		getCollabData("/flags/all", sprite->tic->cart.bank0.flags.data, sizeof(tic_flags));
+		getCollabData("/palette/all", sprite->tic->cart.bank0.palette.data, sizeof(tic_palette));
 	}
 	else
 	{
-		pullSelectedSpritesFromServer(sprite);
-		pullSelectedFlagsFromServer(sprite);
+		pullSpriteSelectionFromServer(sprite);
+		pullFlagsSelectionFromServer(sprite);
 	}
+
+	history_add(sprite->history);
 }
 
 static void upSprite(Sprite* sprite)
@@ -2070,8 +1926,7 @@ static void tick(Sprite* sprite)
 	drawSpriteToolbar(sprite);
 	drawToolbar(sprite->tic, (tic_color_gray), false);
 
-	// if((sprite->tickCounter % 60) == 0)
-	// 	diffWithServer(sprite);
+	checkForServerUpdates(sprite);
 
 	sprite->tickCounter++;
 }

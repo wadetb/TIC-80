@@ -1268,7 +1268,7 @@ static void getUrlStream(const char* url, url_stream_callback callback, void *da
 	URLParts parts;
 	if (!splitUrl(url, &parts))
 		return;
-	netGetStream(platform.net, parts.host, parts.port, parts.path);
+	netGetStream(platform.net, parts.host, parts.port, parts.path, callback, data);
 }
 
 static void preseed()
