@@ -83,6 +83,7 @@ struct Map
 	struct
 	{
 		bool dirty;
+		u8 diff[TIC_MAP_WIDTH * TIC_MAP_HEIGHT];
 		tic_map map;
 	} server;
 	

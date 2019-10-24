@@ -1162,13 +1162,13 @@ static void drawSheetOvr(Sprite* sprite, s32 x, s32 y)
 					u8 left = 0, right = 0, top = 0, bottom = 0;
 
 					s32 bank_index = index % TIC_BANK_SPRITES;
-					if ((bank_index % TIC_SPRITESHEET_COLS) > 0)
+					if((bank_index % TIC_SPRITESHEET_COLS) > 0)
 						left = sprite->server.diff[index - 1];
-					if ((bank_index % TIC_SPRITESHEET_COLS) < TIC_SPRITESHEET_COLS - 1)
+					if((bank_index % TIC_SPRITESHEET_COLS) < TIC_SPRITESHEET_COLS - 1)
 						right = sprite->server.diff[index + 1];
-					if (bank_index >= TIC_SPRITESHEET_COLS)
+					if(bank_index >= TIC_SPRITESHEET_COLS)
 						top = sprite->server.diff[index - TIC_SPRITESHEET_COLS];
-					if (bank_index < TIC_BANK_SPRITES - TIC_SPRITESHEET_COLS)
+					if(bank_index < TIC_BANK_SPRITES - TIC_SPRITESHEET_COLS)
 						bottom = sprite->server.diff[index + TIC_SPRITESHEET_COLS];
 
 					if(!left)

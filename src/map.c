@@ -872,6 +872,36 @@ static void drawMapOvr(Map* map)
 	tic->api.map(tic, map->src, getBankTiles(), map->scroll.x / TIC_SPRITESIZE, map->scroll.y / TIC_SPRITESIZE, 
 		TIC_MAP_SCREEN_WIDTH + 1, TIC_MAP_SCREEN_HEIGHT + 1, -scrollX, -scrollY, -1, 1);
 
+	if(collabEnabled())
+	{
+		for(s32 y = 0; y < TIC_MAP_HEIGHT; y += TIC_SPRITESIZE)
+		{
+			for(s32 x = 0; x < TIC_MAP_WIDTH; x += TIC_SPRITESIZE)
+			{
+				s32 mapX = ((x + map->scroll.x) / TIC_SPRITESIZE + TIC_MAP_WIDTH) % TIC_MAP_WIDTH;
+				s32 mapY = ((y + map->scroll.y) / TIC_SPRITESIZE + TIC_MAP_HEIGHT) % TIC_MAP_HEIGHT;
+
+				s32 index = mapY * TIC_MAP_WIDTH + mapX;
+
+				if(map->server.diff[index])
+				{
+					u8 l = map->server.diff[mapY * TIC_MAP_WIDTH + ((mapX + TIC_MAP_WIDTH - 1) % TIC_MAP_WIDTH)];
+					u8 r = map->server.diff[mapY * TIC_MAP_WIDTH + ((mapX + 1) % TIC_MAP_WIDTH)];
+					u8 t = map->server.diff[mapX + ((mapY + TIC_MAP_HEIGHT - 1) % TIC_MAP_HEIGHT) * TIC_MAP_WIDTH];
+					u8 b = map->server.diff[mapX + ((mapY + 1) % TIC_MAP_HEIGHT) * TIC_MAP_WIDTH];
+
+					s32 sx = x - scrollX;
+					s32 sy = y - scrollY;
+
+					if(!l) tic->api.line(tic, sx, sy, sx, sy + TIC_SPRITESIZE, (tic_color_yellow));
+					if(!r) tic->api.line(tic, sx + TIC_SPRITESIZE, sy, sx + TIC_SPRITESIZE, sy + TIC_SPRITESIZE, (tic_color_yellow));
+					if(!t) tic->api.line(tic, sx, sy, sx + TIC_SPRITESIZE, sy, (tic_color_yellow));
+					if(!b) tic->api.line(tic, sx, sy + TIC_SPRITESIZE, sx + TIC_SPRITESIZE, sy + TIC_SPRITESIZE, (tic_color_yellow));
+				}
+			}
+		}
+	}
+
 	if(map->canvas.grid || map->scroll.active)
 		drawGrid(map);
 
@@ -1108,14 +1138,19 @@ static void pullFromServer(Map *map)
 static void diff(Map *map)
 {
 	map->server.dirty = false;
-	for(int index = 0; index < MAP_WIDTH * MAP_HEIGHT; index++)
-		if(map->src->data[index] != map->server.map.data[index])
+	for(int index = 0; index < TIC_MAP_WIDTH * TIC_MAP_HEIGHT; index++)
+	{
+		bool diff = map->src->data[index] != map->server.map.data[index];
+		map->server.diff[index] = diff;
+		if(diff)
 			map->server.dirty = true;
+	}
 }
 
 static void onPull(Map *map)
 {
 	getCollabData("/map/all", map->server.map.data, sizeof(tic_map));
+	diff(map);
 }
 
 static void processKeyboard(Map* map)
