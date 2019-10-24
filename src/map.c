@@ -1007,34 +1007,68 @@ static void copyFromClipboard(Map* map)
 	}
 }
 
+static void clampSelectionRect(tic_rect* rect)
+{
+	if(rect->x < 0) rect->x = 0;
+	if(rect->y < 0) rect->y = 0;
+	if(rect->w < 0) rect->w = 0;
+	if(rect->h < 0) rect->h = 0;
+	if(rect->x > TIC_MAP_WIDTH-1) rect->x = TIC_MAP_WIDTH-1; 
+	if(rect->y > TIC_MAP_HEIGHT-1) rect->y = TIC_MAP_HEIGHT-1; 
+	if(rect->x + rect->w > TIC_MAP_WIDTH-1) rect->w = TIC_MAP_WIDTH-rect->x;
+	if(rect->y + rect->h > TIC_MAP_HEIGHT-1) rect->h = TIC_MAP_HEIGHT-rect->y;
+}
+
 static void pushSelectionToServer(Map* map)
 {
-	tic_rect* sel = &map->select.rect;
+	tic_rect sel = map->select.rect;
+	clampSelectionRect(&sel);
 
-	if(sel->w > 0 && sel->h > 0)
+	if(sel.w > 0 && sel.h > 0)
 	{	
-		s32 size = sel->w * sel->h + 2;
+		s32 size = sel.w * sel.h;
 		u8* buffer = malloc(size);
 
 		if(buffer)
 		{
-			buffer[0] = sel->w;
-			buffer[1] = sel->h;
+			for(s32 y = sel.y, i = 0; y < sel.y+sel.h; y++)
+				for(s32 x = sel.x; x < sel.x+sel.w; x++)
+					buffer[i++] = map->src->data[y * TIC_MAP_WIDTH + x];
 
-			u8* ptr = buffer + 2;
-
-			for(s32 j = sel->y; j < sel->y+sel->h; j++)
-				for(s32 i = sel->x; i < sel->x+sel->w; i++)
-				{
-					s32 x = i, y = j;
-					normalizeMapRect(&x, &y);
-
-					s32 index = x + y * TIC_MAP_WIDTH;
-					*ptr++ = map->src->data[index];
-				}		
-
-			//toServer(buffer, size, true);
+			char url[256];
+			snprintf(url, sizeof(url), "/map/selection?x=%d&y=%d&w=%d&h=%d", sel.x, sel.y, sel.w, sel.h);
+			putCollabData(url, buffer, size);
+			
 			free(buffer);			
+		}
+	}
+}
+
+static void pullSelectionFromServer(Map* map)
+{
+	tic_rect sel = map->select.rect;
+	clampSelectionRect(&sel);
+
+	if(sel.w > 0 && sel.h > 0)
+	{	
+		s32 expectedSize = sel.w * sel.h;
+
+		char url[256];
+		snprintf(url, sizeof(url), "%s/map/selection?x=%d&y=%d&w=%d&h=%d", getSystem()->getCollabUrl(), sel.x, sel.y, sel.w, sel.h);
+
+		s32 size;
+		u8 *buffer = getSystem()->getUrlRequest(url, &size);
+
+		if(buffer)
+		{
+			if(size == expectedSize)
+			{
+				for(s32 y = sel.y, i = 0; y < sel.y+sel.h; y++)
+					for (s32 x = sel.x; x < sel.x+sel.w; x++)
+						map->src->data[y * TIC_MAP_WIDTH + x] = buffer[i++];
+			}
+			
+			free(buffer);
 		}
 	}
 }
@@ -1050,7 +1084,7 @@ static void pushToServer(Map *map)
 	}
 	else
 	{
-//		pushSelectionToServer(map);
+		pushSelectionToServer(map);
 	}
 }
 
@@ -1065,8 +1099,10 @@ static void pullFromServer(Map *map)
 	}
 	else
 	{
-//		pullSelectionFromServer(map);
+		pullSelectionFromServer(map);
 	}
+
+	history_add(map->history);
 }
 
 static void diff(Map *map)
@@ -1095,6 +1131,8 @@ static void processKeyboard(Map* map)
 	case TIC_CLIPBOARD_CUT: cutToClipboard(map); break;
 	case TIC_CLIPBOARD_COPY: copyToClipboard(map); break;
 	case TIC_CLIPBOARD_PASTE: copyFromClipboard(map); break;
+	case TIC_TOOLBAR_PUSH: pushToServer(map); break;
+	case TIC_TOOLBAR_PULL: pullFromServer(map); break;
 	default: break;
 	}
 	

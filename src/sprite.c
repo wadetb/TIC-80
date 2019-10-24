@@ -1563,7 +1563,7 @@ static void pullSpriteSelectionFromServer(Sprite* sprite)
 	snprintf(url, sizeof(url), "%s/sprite/single?index=%d&size=%d", getSystem()->getCollabUrl(), sprite->index, sprite->size);
 
 	s32 size;
-	tic_tile *buffer = getSystem()->getUrlRequest(url, &size);
+	tic_tile *buffer = (tic_tile*)getSystem()->getUrlRequest(url, &size);
 
 	if(buffer)
 	{
@@ -1591,7 +1591,7 @@ static void pullFlagsSelectionFromServer(Sprite* sprite)
 	snprintf(url, sizeof(url), "%s/flags/single?index=%d&size=%d", getSystem()->getCollabUrl(), sprite->index, sprite->size);
 
 	s32 size;
-	u8 *buffer = getSystem()->getUrlRequest(url, &size);
+	u8 *buffer = (u8*)getSystem()->getUrlRequest(url, &size);
 
 	if(buffer)
 	{
@@ -1650,11 +1650,11 @@ static void diff(Sprite *sprite)
 {
 	sprite->server.dirty = false;
 
-	tic_tile *serverTiles = &sprite->server.tiles.data;
-	tic_tile *myTiles = &sprite->src->data;
+	tic_tile *serverTiles = sprite->server.tiles.data;
+	tic_tile *myTiles = sprite->src->data;
 
-	u8 *serverFlags = &sprite->server.flags.data;
-	u8 *myFlags = &sprite->tic->cart.bank0.flags.data;
+	u8 *serverFlags = sprite->server.flags.data;
+	u8 *myFlags = sprite->tic->cart.bank0.flags.data;
 
 	for(s32 index = 0; index < TIC_SPRITES; index++)
 	{
@@ -1727,6 +1727,8 @@ static void processKeyboard(Sprite* sprite)
 	case TIC_CLIPBOARD_CUT: cutToClipboard(sprite); break;
 	case TIC_CLIPBOARD_COPY: copyToClipboard(sprite); break;
 	case TIC_CLIPBOARD_PASTE: copyFromClipboard(sprite); break;
+	case TIC_TOOLBAR_PUSH: pushToServer(sprite); break;
+	case TIC_TOOLBAR_PULL: pullFromServer(sprite); break;
 	default: break;
 	}
 

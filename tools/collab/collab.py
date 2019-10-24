@@ -147,6 +147,24 @@ class CollabHandler(http.server.BaseHTTPRequestHandler):
 
             self.wfile.write(tic.map)
 
+        elif self.path.startswith('/map/selection'):
+            query = parse_qs(urlparse(self.path).query)
+            sel_x = int(query['x'][0])
+            sel_y = int(query['y'][0])
+            sel_w = int(query['w'][0])
+            sel_h = int(query['h'][0])
+
+            buffer = bytearray()
+            for y in range(sel_y, sel_y+sel_h):
+                for x in range(sel_x, sel_x+sel_w):
+                    buffer.append(tic.map[y * TIC_MAP_WIDTH + x])
+
+            self.send_response(200)
+            self.send_header('Content-Length', '{}'.format(len(buffer)))
+            self.end_headers()
+
+            self.wfile.write(buffer)
+
         else:
             self.send_response(400)
             self.end_headers()
@@ -212,6 +230,23 @@ class CollabHandler(http.server.BaseHTTPRequestHandler):
 
         elif self.path.startswith('/map/all'):
             tic.map = bytearray(self.rfile.read(TIC_MAP_WIDTH * TIC_MAP_HEIGHT))
+
+            tic.signal_update('map')
+
+            self.send_response(200)
+            self.end_headers()
+
+        elif self.path.startswith('/map/selection'):
+            query = parse_qs(urlparse(self.path).query)
+            sel_x = int(query['x'][0])
+            sel_y = int(query['y'][0])
+            sel_w = int(query['w'][0])
+            sel_h = int(query['h'][0])
+
+            for y in range(sel_y, sel_y+sel_h):
+                for x in range(sel_x, sel_x+sel_w):
+                    sprite = self.rfile.read(1)[0]
+                    tic.map[y * TIC_MAP_WIDTH + x] = sprite
 
             tic.signal_update('map')
 

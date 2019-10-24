@@ -886,6 +886,8 @@ ClipboardEvent getClipboardEvent()
 		if(keyWasPressed(tic_key_insert) || keyWasPressed(tic_key_c)) return TIC_CLIPBOARD_COPY;
 		else if(keyWasPressed(tic_key_x)) return TIC_CLIPBOARD_CUT;
 		else if(keyWasPressed(tic_key_v)) return TIC_CLIPBOARD_PASTE;
+		else if(keyWasPressed(tic_key_p)) return TIC_TOOLBAR_PUSH;
+		else if(keyWasPressed(tic_key_l)) return TIC_TOOLBAR_PULL;
 	}
 	else if(shift)
 	{

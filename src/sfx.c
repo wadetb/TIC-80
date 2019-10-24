@@ -1020,6 +1020,8 @@ static void onStudioEnvelopeEvent(Sfx* sfx, StudioEvent event)
 	case TIC_TOOLBAR_PASTE: copyFromClipboard(sfx); break;
 	case TIC_TOOLBAR_UNDO: undo(sfx); break;
 	case TIC_TOOLBAR_REDO: redo(sfx); break;
+	case TIC_TOOLBAR_PUSH: pushToServer(sfx); break;
+	case TIC_TOOLBAR_PULL: pullFromServer(sfx); break;
 	default: break;
 	}
 }
