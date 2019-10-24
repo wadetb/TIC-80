@@ -449,6 +449,13 @@ void showTooltip(const char* text)
 	strncpy(impl.tooltip.text, text, sizeof impl.tooltip.text - 1);
 }
 
+static bool isToolbarButtonEnabled(StudioEvent event)
+{
+	if(event == TIC_TOOLBAR_PUSH || event == TIC_TOOLBAR_PULL)
+		return collabEnabled();
+	return true;
+}
+
 static void drawExtrabar(tic_mem* tic)
 {
 	enum {Size = 7};
@@ -534,26 +541,29 @@ static void drawExtrabar(tic_mem* tic)
 		u8 bgcolor = (tic_color_white);
 		u8 color = (tic_color_light_blue);
 
-		if(checkMousePos(&rect))
+		if(isToolbarButtonEnabled(Events[i]))
 		{
-			setCursor(tic_cursor_hand);
-
-			color = Colors[i];
-			showTooltip(Tips[i]);
-
-			if(checkMouseDown(&rect, tic_mouse_left))
+			if(checkMousePos(&rect))
 			{
-				bgcolor = color;
-				color = (tic_color_white);
+				setCursor(tic_cursor_hand);
+
+				color = Colors[i];
+				showTooltip(Tips[i]);
+
+				if(checkMouseDown(&rect, tic_mouse_left))
+				{
+					bgcolor = color;
+					color = (tic_color_white);
+				}
+				else if(checkMouseClick(&rect, tic_mouse_left))
+				{
+					setStudioEvent(Events[i]);
+				}
 			}
-			else if(checkMouseClick(&rect, tic_mouse_left))
-			{
-				setStudioEvent(Events[i]);
-			}
+
+			impl.studio.tic->api.rect(tic, x, y, Widths[i], Size, bgcolor);
+			drawBitIcon(x, y, Icons + i*BITS_IN_BYTE, color);
 		}
-
-		impl.studio.tic->api.rect(tic, x, y, Widths[i], Size, bgcolor);
-		drawBitIcon(x, y, Icons + i*BITS_IN_BYTE, color);
 
 		x += Widths[i];
 	}
