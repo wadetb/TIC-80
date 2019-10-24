@@ -1007,7 +1007,7 @@ static void copyFromClipboard(Map* map)
 	}
 }
 
-static void pushToServer(Map* map)
+static void pushSelectionToServer(Map* map)
 {
 	tic_rect* sel = &map->select.rect;
 
@@ -1039,9 +1039,47 @@ static void pushToServer(Map* map)
 	}
 }
 
-static void pullFromServer()
+static void pushToServer(Map *map)
 {
+	if(!getSystem()->getCollabUrl())
+		return;
 
+	if(map->tic->api.key(map->tic, tic_key_shift))
+	{
+		putCollabData("/map/all", map->src->data, sizeof(tic_map));
+	}
+	else
+	{
+//		pushSelectionToServer(map);
+	}
+}
+
+static void pullFromServer(Map *map)
+{
+	if(!getSystem()->getCollabUrl())
+		return;
+
+	if(map->tic->api.key(map->tic, tic_key_shift))
+	{
+		getCollabData("/map/all", map->src->data, sizeof(tic_map));
+	}
+	else
+	{
+//		pullSelectionFromServer(map);
+	}
+}
+
+static void diff(Map *map)
+{
+	map->server.dirty = false;
+	for(int index = 0; index < MAP_WIDTH * MAP_HEIGHT; index++)
+		if(map->src->data[index] != map->server.map.data[index])
+			map->server.dirty = true;
+}
+
+static void onPull(Map *map)
+{
+	getCollabData("/map/all", map->server.map.data, sizeof(tic_map));
 }
 
 static void processKeyboard(Map* map)
@@ -1103,6 +1141,8 @@ static void tick(Map* map)
 	drawSheet(map, TIC80_WIDTH - TIC_SPRITESHEET_SIZE - 1, TOOLBAR_SIZE);
 	drawMapToolbar(map, TIC80_WIDTH - 9*TIC_FONT_WIDTH, 1);
 	drawToolbar(map->tic, TIC_COLOR_BG, false);
+
+	diff(map);
 }
 
 static void onStudioEvent(Map* map, StudioEvent event)
@@ -1177,6 +1217,7 @@ void initMap(Map* map, tic_mem* tic, tic_map* src)
 		},
 		.history = history_create(src, sizeof(tic_map)),
 		.event = onStudioEvent,
+		.pull = onPull,
 		.overline = overline,
 		.scanline = scanline,
 	};

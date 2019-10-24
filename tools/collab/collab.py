@@ -8,6 +8,11 @@ from urllib.parse import urlparse, parse_qs
 
 PORT = 8000
 
+TIC80_WIDTH = 240
+TIC80_HEIGHT = 136
+
+TOOLBAR_SIZE = 7
+
 BITS_IN_BYTE = 8
 
 TIC_PALETTE_BPP = 4
@@ -23,6 +28,12 @@ TIC_SPRITESHEET_SIZE = (TIC_SPRITESHEET_COLS * TIC_SPRITESIZE)
 
 TIC_FLAGS = (TIC_BANK_SPRITES * TIC_SPRITE_BANKS)
 
+TIC_MAP_ROWS = TIC_SPRITESIZE
+TIC_MAP_COLS = TIC_SPRITESIZE
+TIC_MAP_SCREEN_WIDTH = TIC80_WIDTH // TIC_SPRITESIZE
+TIC_MAP_SCREEN_HEIGHT = TIC80_HEIGHT // TIC_SPRITESIZE
+TIC_MAP_WIDTH = TIC_MAP_SCREEN_WIDTH * TIC_MAP_ROWS
+TIC_MAP_HEIGHT = TIC_MAP_SCREEN_HEIGHT * TIC_MAP_COLS
 
 class TIC:
     def __init__(self):
@@ -33,8 +44,10 @@ class TIC:
         self.flags = bytearray(b'\0' * TIC_FLAGS)
         self.palette = bytearray(b'\0' * TIC_PALETTE_SIZE * TIC_PALETTE_CHANNELS)
 
+        self.map = bytearray(b'\0' * TIC_MAP_WIDTH * TIC_MAP_HEIGHT)
+
         self.condition = threading.Condition()
-        self.update_keys = {'sprite': 0, 'flags': 0, 'palette': 0}
+        self.update_keys = {'sprite': 0, 'flags': 0, 'palette': 0, 'map': 0}
 
     def signal_update(self, key):
         with self.condition:
@@ -127,6 +140,13 @@ class CollabHandler(http.server.BaseHTTPRequestHandler):
 
             self.wfile.write(tic.palette)
 
+        elif self.path.startswith('/map/all'):
+            self.send_response(200)
+            self.send_header('Content-Length', '{}'.format(TIC_MAP_WIDTH * TIC_MAP_HEIGHT))
+            self.end_headers()
+
+            self.wfile.write(tic.map)
+
         else:
             self.send_response(400)
             self.end_headers()
@@ -186,6 +206,14 @@ class CollabHandler(http.server.BaseHTTPRequestHandler):
             tic.palette = bytearray(self.rfile.read(TIC_PALETTE_SIZE * TIC_PALETTE_CHANNELS))
 
             tic.signal_update('palette')
+
+            self.send_response(200)
+            self.end_headers()
+
+        elif self.path.startswith('/map/all'):
+            tic.map = bytearray(self.rfile.read(TIC_MAP_WIDTH * TIC_MAP_HEIGHT))
+
+            tic.signal_update('map')
 
             self.send_response(200)
             self.end_headers()

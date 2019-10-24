@@ -80,8 +80,15 @@ struct Map
 
 	struct History* history;
 
+	struct
+	{
+		bool dirty;
+		tic_map map;
+	} server;
+	
 	void (*tick)(Map*);
 	void (*event)(Map*, StudioEvent);
+	void (*pull)(Map*);
 	void (*scanline)(tic_mem* tic, s32 row, void* data);
 	void (*overline)(tic_mem* tic, void* data);
 };

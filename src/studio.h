@@ -137,16 +137,9 @@ typedef enum
 void setStudioEvent(StudioEvent event);
 void showTooltip(const char* text);
 
-typedef enum
-{
-	TIC_COLLAB_SPRITES_CHANGED,
-	TIC_COLLAB_FLAGS_CHANGED,
-	TIC_COLLAB_PALETTE_CHANGED,
-} CollabEvent;
-
 void startCollabStream();
-bool peekCollabEvent(CollabEvent event);
-bool checkCollabEvent(CollabEvent event);
+void getCollabData(const char* path, void *dest, s32 destSize);
+void putCollabData(const char* path, void *data, s32 size);
 
 tic_key* getKeymap();
 

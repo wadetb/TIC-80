@@ -1504,31 +1504,6 @@ static void copyFromClipboard(Sprite* sprite)
 	}
 }
 
-static void getCollabData(const char* path, void *dest, s32 destSize)
-{
-	char url[256];
-	snprintf(url, sizeof(url), "%s%s", getSystem()->getCollabUrl(), path);
-
-	s32 size;
-	void *buffer = getSystem()->getUrlRequest(url, &size);
-
-	if(buffer)
-	{
-		if(size == destSize)
-			memcpy(dest, buffer, destSize);
-		
-		free(buffer);
-	}
-}
-
-static void putCollabData(const char* path, void *data, s32 size)
-{
-	char url[256];
-	snprintf(url, sizeof(url), "%s%s", getSystem()->getCollabUrl(), path);
-
-	getSystem()->putUrlRequest(url, data, size);
-}
-
 static void pushSpriteSelectionToServer(Sprite* sprite)
 {
 	s32 sizeInTiles = sprite->size / TIC_SPRITESIZE;

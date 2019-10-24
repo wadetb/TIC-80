@@ -692,6 +692,8 @@ bool modeHasChanges(EditorMode mode)
 	{
 	case TIC_SPRITE_MODE:
 		return impl.editor[impl.bank.index.sprites].sprite->server.dirty;
+	case TIC_MAP_MODE:
+		return impl.editor[impl.bank.index.map].map->server.dirty;
 	default:
 		return false;
 	}
@@ -1201,6 +1203,31 @@ bool studioCartChanged()
 	return memcmp(hash.data, impl.cart.hash.data, sizeof(CartHash)) != 0;
 }
 
+void getCollabData(const char* path, void *dest, s32 destSize)
+{
+	char url[256];
+	snprintf(url, sizeof(url), "%s%s", getSystem()->getCollabUrl(), path);
+
+	s32 size;
+	void *buffer = getSystem()->getUrlRequest(url, &size);
+
+	if(buffer)
+	{
+		if(size == destSize)
+			memcpy(dest, buffer, destSize);
+		
+		free(buffer);
+	}
+}
+
+void putCollabData(const char* path, void *data, s32 size)
+{
+	char url[256];
+	snprintf(url, sizeof(url), "%s%s", getSystem()->getCollabUrl(), path);
+
+	getSystem()->putUrlRequest(url, data, size);
+}
+
 static bool collabStreamCallback(u8* buffer, s32 size, void* data)
 {
 	char* copy = malloc(size + 1);
@@ -1211,6 +1238,12 @@ static bool collabStreamCallback(u8* buffer, s32 size, void* data)
 	{
 		Sprite* sprite = impl.editor[impl.bank.index.sprites].sprite;
 		sprite->pull(sprite);
+	}
+
+	//if(strstr(copy, "map") != NULL)
+	{
+		Map* map = impl.editor[impl.bank.index.map].map;
+		map->pull(map);
 	}
 
 	free(copy);
@@ -1225,22 +1258,6 @@ void startCollabStream()
 	char url[1024];
 	snprintf(url, sizeof(url), "%s/watch", getSystem()->getCollabUrl());
 	getSystem()->getUrlStream(url, collabStreamCallback, (void*)(uintptr_t)impl.collab.streamCounter);
-}
-
-bool checkCollabEvent(CollabEvent event)
-{
-	u32 bit = 1 << event;
-	if(impl.collab.changed & bit)
-	{
-		impl.collab.changed &= ~bit;
-		return true;
-	} else return false;
-}
-
-bool peekCollabEvent(CollabEvent event)
-{
-	u32 bit = 1 << event;
-	return (impl.collab.changed & bit) != 0;
 }
 
 tic_key* getKeymap()
