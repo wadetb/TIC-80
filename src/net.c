@@ -284,6 +284,8 @@ typedef struct
 {
 	bool cancel;
 	Net *net;
+	char host[FILENAME_MAX];
+	char path[FILENAME_MAX];
 	Request req;
 	NetResponse callback;
 	void* data;
@@ -311,34 +313,42 @@ int SDLCALL netStreamThread(void *data)
 
 	while(!stream->cancel)
 		httpRequest(&stream->req);
+
+	free(stream);
 }
 
 void netGetStream(Net* net, const char *host, u16 port, const char* path, NetResponse callback, void* data)
 {
 	NetStreamData* stream = (NetStreamData*)malloc(sizeof(NetStreamData));
 
-	*stream = (NetStreamData)
+	if(stream)
 	{
-		.net = net,
-		.cancel = false,
-
-		.req = (Request)
+		*stream = (NetStreamData)
 		{
-			.host = host,
+			.net = net,
+			.cancel = false,
+			.callback = callback,
+			.data = data
+		};
+
+		snprintf(stream->host, sizeof(stream->host), "%s", host);
+		snprintf(stream->path, sizeof(stream->path), "%s", path);
+
+		stream->req = (Request)
+		{
+			.host = stream->host,
 			.port = port,
 			.method = "GET",
-			.path = path,
+			.path = stream->path,
 			.timeout = 3000,
 			.streamCallback = netStreamCallback,
 			.streamData = stream,
-		},
+		};
 
-		.callback = callback,
-		.data = data
-	};
-
-	SDL_Thread *thread = SDL_CreateThread(netStreamThread, "stream thread", stream);
-	SDL_DetachThread(thread);
+		SDL_Thread *thread = SDL_CreateThread(netStreamThread, "stream thread", stream);
+		if(thread)
+			SDL_DetachThread(thread);
+	}
 }
 
 Net* createNet()

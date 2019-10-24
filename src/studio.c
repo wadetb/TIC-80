@@ -705,6 +705,8 @@ bool modeHasChanges(EditorMode mode)
 		return impl.editor[impl.bank.index.sprites].sprite->server.dirty;
 	case TIC_MAP_MODE:
 		return impl.editor[impl.bank.index.map].map->server.dirty;
+	case TIC_SFX_MODE:
+		return impl.editor[impl.bank.index.sfx].sfx->server.dirty;
 	default:
 		return false;
 	}
@@ -1232,6 +1234,12 @@ static bool collabStreamCallback(u8* buffer, s32 size, void* data)
 	{
 		Map* map = impl.editor[impl.bank.index.map].map;
 		map->pull(map);
+	}
+
+	//if(strstr(copy, "sample") != NULL || strstr(copy, "envelope") != NULL)
+	{
+		Sfx* sfx = impl.editor[impl.bank.index.sfx].sfx;
+		sfx->pull(sfx);
 	}
 
 	free(copy);

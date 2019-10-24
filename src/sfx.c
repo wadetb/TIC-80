@@ -37,7 +37,11 @@
 
 #define DEFAULT_CHANNEL 0
 
-static void drawSwitch(Sfx* sfx, s32 x, s32 y, const char* label, s32 value, void(*set)(Sfx*, s32))
+#define SWITCH_CURRENT_VALUE_IS_DIRTY (1<<0)
+#define SWITCH_LATER_VALUE_IS_DIRTY (1<<1)
+#define SWITCH_PRIOR_VALUE_IS_DIRTY (1<<2)
+
+static void drawSwitch(Sfx* sfx, s32 x, s32 y, u8 dirty, const char* label, s32 value, void(*set)(Sfx*, s32))
 {
 	static const u8 LeftArrow[] = 
 	{
@@ -78,13 +82,17 @@ static void drawSwitch(Sfx* sfx, s32 x, s32 y, const char* label, s32 value, voi
 				set(sfx, -1);
 		}
 
-		drawBitIcon(rect.x, rect.y, LeftArrow, (tic_color_dark_gray));
+		u8 color = (dirty & SWITCH_PRIOR_VALUE_IS_DIRTY) ? (tic_color_yellow) : (tic_color_dark_gray);
+
+		drawBitIcon(rect.x, rect.y, LeftArrow, color);
 	}
 
 	{
+		u8 color = (dirty & SWITCH_CURRENT_VALUE_IS_DIRTY) ? (tic_color_yellow) : (tic_color_white);
+
 		char val[] = "99";
 		sprintf(val, "%02i", value);
-		sfx->tic->api.fixed_text(sfx->tic, val, x += TIC_FONT_WIDTH, y, (tic_color_white), false);
+		sfx->tic->api.fixed_text(sfx->tic, val, x += TIC_FONT_WIDTH, y, color, false);
 	}
 
 	{
@@ -100,7 +108,9 @@ static void drawSwitch(Sfx* sfx, s32 x, s32 y, const char* label, s32 value, voi
 				set(sfx, +1);
 		}
 
-		drawBitIcon(rect.x, rect.y, RightArrow, (tic_color_dark_gray));
+		u8 color = (dirty & SWITCH_LATER_VALUE_IS_DIRTY) ? (tic_color_yellow) : (tic_color_white);
+
+		drawBitIcon(rect.x, rect.y, RightArrow, color);
 	}
 }
 
@@ -164,11 +174,26 @@ static void drawTopPanel(Sfx* sfx, s32 x, s32 y)
 {
 	const s32 Gap = 8*TIC_FONT_WIDTH;
 
-	drawSwitch(sfx, x, y, "IDX", sfx->index, setIndex);
+	u8 dirty = 0;
+	if(collabEnabled())
+	{
+		if(sfx->server.sample_diff[sfx->index])
+			dirty |= SWITCH_CURRENT_VALUE_IS_DIRTY;
+
+		for(s32 i = sfx->index-1; i >= 0; i--)
+			if(sfx->server.sample_diff[i])
+				dirty |= SWITCH_PRIOR_VALUE_IS_DIRTY;
+
+		for(s32 i = sfx->index+1; i < SFX_COUNT; i++)
+			if(sfx->server.sample_diff[i])
+				dirty |= SWITCH_LATER_VALUE_IS_DIRTY;
+	}
+
+	drawSwitch(sfx, x, y, dirty, "IDX", sfx->index, setIndex);
 
 	tic_sample* effect = getEffect(sfx);
 
-	drawSwitch(sfx, x += Gap, y, "SPD", effect->speed, setSpeed);
+	drawSwitch(sfx, x += Gap, y, 0, "SPD", effect->speed, setSpeed);
 
 	drawStereoSwitch(sfx, x += Gap, y);
 }
@@ -202,8 +227,8 @@ static void drawLoopPanel(Sfx* sfx, s32 x, s32 y)
 	tic_sample* effect = getEffect(sfx);
 	tic_sound_loop* loop = effect->loops + sfx->canvasTab;
 
-	drawSwitch(sfx, x, y += Gap + TIC_FONT_HEIGHT, "", loop->size, setLoopSize);
-	drawSwitch(sfx, x, y += Gap + TIC_FONT_HEIGHT, "", loop->start, setLoopStart);
+	drawSwitch(sfx, x, y += Gap + TIC_FONT_HEIGHT, 0, "", loop->size, setLoopSize);
+	drawSwitch(sfx, x, y += Gap + TIC_FONT_HEIGHT, 0, "", loop->start, setLoopStart);
 }
 
 static tic_waveform* getWaveformById(Sfx* sfx, s32 i)
@@ -668,10 +693,89 @@ static void copyWaveFromClipboard(Sfx* sfx)
 
 static void pushToServer(Sfx* sfx)
 {
+	if(!collabEnabled())
+		return;
+
+	if(sfx->tic->api.key(sfx->tic, tic_key_shift))
+	{
+		putCollabData("/sample/all", sfx->src->samples.data, sizeof(tic_samples));
+		putCollabData("/envelope/all", sfx->src->waveform.envelopes, sizeof(tic_waveforms));
+	}
+	else
+	{
+		if(sfx->tab == SFX_ENVELOPES_TAB)
+		{
+			char path[1024];
+			snprintf(path, sizeof(path), "/sample/selected?index=%d", sfx->index);
+			putCollabData(path, &sfx->src->samples.data[sfx->index], sizeof(tic_sample)); 
+		}
+		else
+		{
+			char path[1024];
+			snprintf(path, sizeof(path), "/envelope/selected?index=%d", sfx->waveform.index);
+			putCollabData(path, &sfx->src->waveform.envelopes[sfx->waveform.index], sizeof(tic_waveform)); 
+		}
+	}
 }
 
 static void pullFromServer(Sfx* sfx)
 {
+	if(!collabEnabled())
+		return;
+
+	if(sfx->tic->api.key(sfx->tic, tic_key_shift))
+	{
+		getCollabData("/sample/all", &sfx->src->samples, sizeof(tic_samples));
+		getCollabData("/envelope/all", &sfx->src->waveform, sizeof(tic_waveforms));
+	}
+	else
+	{
+		if(sfx->tab == SFX_ENVELOPES_TAB)
+		{
+			char path[1024];
+			snprintf(path, sizeof(path), "/sample/selected?index=%d", sfx->index);
+			getCollabData(path, &sfx->src->samples.data[sfx->index], sizeof(tic_sample)); 
+		}
+		else
+		{
+			char path[1024];
+			snprintf(path, sizeof(path), "/envelope/selected?index=%d", sfx->waveform.index);
+			getCollabData(path, &sfx->src->waveform.envelopes[sfx->waveform.index], sizeof(tic_waveform)); 
+		}
+	}
+
+	history_add(sfx->history);
+}
+
+static void diff(Sfx *sfx)
+{
+	sfx->server.dirty = false;
+
+	if(collabEnabled())
+	{
+		for(s32 i = 0; i < ENVELOPES_COUNT; i++)
+		{
+			bool diff = memcmp(&sfx->src->waveform.envelopes[i], &sfx->server.sfx.waveform.envelopes[i], sizeof(tic_waveform)) != 0;
+			sfx->server.envelope_diff[i] = diff;
+			if(diff)
+				sfx->server.dirty = true;
+		}
+
+		for(s32 i = 0; i < SFX_COUNT; i++)
+		{
+			bool diff = memcmp(&sfx->src->samples.data[i], &sfx->server.sfx.samples.data[i], sizeof(tic_sample)) != 0;
+			sfx->server.sample_diff[i] = diff;
+			if(diff)
+				sfx->server.dirty = true;
+		}
+	}
+}
+
+static void onPull(Sfx *sfx)
+{
+	getCollabData("/envelope/all", &sfx->server.sfx.waveform, sizeof(tic_waveforms));
+	getCollabData("/sample/all", &sfx->server.sfx.samples, sizeof(tic_samples));
+	diff(sfx);
 }
 
 static void processKeyboard(Sfx* sfx)
@@ -733,6 +837,8 @@ static void processEnvelopesKeyboard(Sfx* sfx)
 	case TIC_CLIPBOARD_CUT: cutToClipboard(sfx); break;
 	case TIC_CLIPBOARD_COPY: copyToClipboard(sfx); break;
 	case TIC_CLIPBOARD_PASTE: copyFromClipboard(sfx); break;
+	case TIC_TOOLBAR_PUSH: pushToServer(sfx); break;
+	case TIC_TOOLBAR_PULL: pullFromServer(sfx); break;
 	default: break;
 	}
 
@@ -759,6 +865,8 @@ static void processWaveformKeyboard(Sfx* sfx)
 	case TIC_CLIPBOARD_CUT: cutWaveToClipboard(sfx); break;
 	case TIC_CLIPBOARD_COPY: copyWaveToClipboard(sfx); break;
 	case TIC_CLIPBOARD_PASTE: copyWaveFromClipboard(sfx); break;
+	case TIC_TOOLBAR_PUSH: pushToServer(sfx); break;
+	case TIC_TOOLBAR_PULL: pullFromServer(sfx); break;
 	default: break;
 	}
 
@@ -925,6 +1033,10 @@ static void drawWaveformBar(Sfx* sfx, s32 x, s32 y)
 		if(sfx->waveform.index == i)
 			sfx->tic->api.rect_border(sfx->tic, rect.x-2, rect.y-2, rect.w+4, rect.h+4, (tic_color_white));
 
+		if(collabEnabled())
+			if(sfx->server.envelope_diff[i])
+				sfx->tic->api.rect_border(sfx->tic, rect.x+1, rect.y+1, rect.w-2, rect.h-2, (tic_color_yellow));
+		
 		{
 			tic_waveform* wave = getWaveformById(sfx, i);
 
@@ -1009,6 +1121,8 @@ static void tick(Sfx* sfx)
 	}
 
 	playSound(sfx);
+
+	diff(sfx);
 }
 
 static void onStudioEnvelopeEvent(Sfx* sfx, StudioEvent event)
@@ -1074,5 +1188,6 @@ void initSfx(Sfx* sfx, tic_mem* tic, tic_sfx* src)
 		.tab = SFX_ENVELOPES_TAB,
 		.history = history_create(src, sizeof(tic_sfx)),
 		.event = onStudioEvent,
+		.pull = onPull,
 	};
 }

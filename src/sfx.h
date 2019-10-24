@@ -61,8 +61,17 @@ struct Sfx
 
 	struct History* history;
 
+	struct
+	{
+		bool dirty;
+		bool envelope_diff[ENVELOPES_COUNT];
+		bool sample_diff[SFX_COUNT];
+		tic_sfx sfx;
+	}server;
+
 	void(*tick)(Sfx*);
 	void(*event)(Sfx*, StudioEvent);
+	void(*pull)(Sfx*);
 };
 
 void initSfx(Sfx*, tic_mem*, tic_sfx* src);

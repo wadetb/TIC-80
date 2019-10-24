@@ -8,25 +8,25 @@ from urllib.parse import urlparse, parse_qs
 
 PORT = 8000
 
+BITS_IN_BYTE = 8
+
 TIC80_WIDTH = 240
 TIC80_HEIGHT = 136
 
 TOOLBAR_SIZE = 7
 
-BITS_IN_BYTE = 8
-
 TIC_PALETTE_BPP = 4
-TIC_PALETTE_SIZE = (1 << TIC_PALETTE_BPP)
+TIC_PALETTE_SIZE = 1 << TIC_PALETTE_BPP
 TIC_PALETTE_CHANNELS = 3
 
-TIC_BANK_SPRITES = (1 << BITS_IN_BYTE)
+TIC_BANK_SPRITES = 1 << BITS_IN_BYTE
 TIC_SPRITE_BANKS = 2
-TIC_SPRITES = (TIC_BANK_SPRITES * TIC_SPRITE_BANKS)
+TIC_SPRITES = TIC_BANK_SPRITES * TIC_SPRITE_BANKS
 TIC_SPRITESIZE = 8
 TIC_SPRITESHEET_COLS = 16
-TIC_SPRITESHEET_SIZE = (TIC_SPRITESHEET_COLS * TIC_SPRITESIZE)
+TIC_SPRITESHEET_SIZE = TIC_SPRITESHEET_COLS * TIC_SPRITESIZE
 
-TIC_FLAGS = (TIC_BANK_SPRITES * TIC_SPRITE_BANKS)
+TIC_FLAGS = TIC_BANK_SPRITES * TIC_SPRITE_BANKS
 
 TIC_MAP_ROWS = TIC_SPRITESIZE
 TIC_MAP_COLS = TIC_SPRITESIZE
@@ -34,6 +34,17 @@ TIC_MAP_SCREEN_WIDTH = TIC80_WIDTH // TIC_SPRITESIZE
 TIC_MAP_SCREEN_HEIGHT = TIC80_HEIGHT // TIC_SPRITESIZE
 TIC_MAP_WIDTH = TIC_MAP_SCREEN_WIDTH * TIC_MAP_ROWS
 TIC_MAP_HEIGHT = TIC_MAP_SCREEN_HEIGHT * TIC_MAP_COLS
+
+SFX_COUNT_BITS = 6
+SFX_COUNT = (1 << SFX_COUNT_BITS)
+
+SFX_TICKS = 30
+SAMPLE_SIZE = SFX_TICKS * 2 + 2 + 4 # 30*2:data, 2:misc, 4:loops
+
+ENVELOPES_COUNT = 16
+ENVELOPE_VALUES = 32
+ENVELOPE_VALUE_BITS = 4
+ENVELOPE_SIZE = (ENVELOPE_VALUES * ENVELOPE_VALUE_BITS // BITS_IN_BYTE)
 
 class TIC:
     def __init__(self):
@@ -46,8 +57,11 @@ class TIC:
 
         self.map = bytearray(b'\0' * TIC_MAP_WIDTH * TIC_MAP_HEIGHT)
 
+        self.samples = [bytearray(b'\0' * SAMPLE_SIZE) for _ in range(SFX_COUNT)]
+        self.envelopes = [bytearray(b'\0' * ENVELOPE_SIZE) for _ in range(ENVELOPES_COUNT)]
+
         self.condition = threading.Condition()
-        self.update_keys = {'sprite': 0, 'flags': 0, 'palette': 0, 'map': 0}
+        self.update_keys = {'sprite': 0, 'flags': 0, 'palette': 0, 'map': 0, 'sfx': 0}
 
     def signal_update(self, key):
         with self.condition:
@@ -76,6 +90,8 @@ class CollabHandler(http.server.BaseHTTPRequestHandler):
             self.send_response(200)
             self.end_headers()
 
+            print("GOT WATCHER")
+            
             keys = {}
             while True:
                 changed = tic.wait_update(keys)
@@ -165,6 +181,48 @@ class CollabHandler(http.server.BaseHTTPRequestHandler):
 
             self.wfile.write(buffer)
 
+        elif self.path.startswith('/sample/all'):
+            buffer = bytearray()
+            for sample in tic.samples:
+                buffer.extend(sample)
+
+            self.send_response(200)
+            self.send_header('Content-Length', '{}'.format(len(buffer)))
+            self.end_headers()
+
+            self.wfile.write(buffer)
+
+        elif self.path.startswith('/sample/selected'):
+            query = parse_qs(urlparse(self.path).query)
+            index = int(query['index'][0])
+
+            self.send_response(200)
+            self.send_header('Content-Length', '{}'.format(SAMPLE_SIZE))
+            self.end_headers()
+
+            self.wfile.write(tic.samples[index])
+
+        elif self.path.startswith('/envelope/all'):
+            buffer = bytearray()
+            for envelope in tic.envelopes:
+                buffer.extend(envelope)
+
+            self.send_response(200)
+            self.send_header('Content-Length', '{}'.format(len(buffer)))
+            self.end_headers()
+
+            self.wfile.write(buffer)
+
+        elif self.path.startswith('/envelope/selected'):
+            query = parse_qs(urlparse(self.path).query)
+            index = int(query['index'][0])
+
+            self.send_response(200)
+            self.send_header('Content-Length', '{}'.format(ENVELOPE_SIZE))
+            self.end_headers()
+
+            self.wfile.write(tic.envelopes[index])
+
         else:
             self.send_response(400)
             self.end_headers()
@@ -249,6 +307,46 @@ class CollabHandler(http.server.BaseHTTPRequestHandler):
                     tic.map[y * TIC_MAP_WIDTH + x] = sprite
 
             tic.signal_update('map')
+
+            self.send_response(200)
+            self.end_headers()
+
+        elif self.path.startswith('/sample/all'):
+            for index in range(SFX_COUNT):
+                tic.samples[index] = self.rfile.read(SAMPLE_SIZE)
+
+            tic.signal_update('sfx')
+
+            self.send_response(200)
+            self.end_headers()
+
+        elif self.path.startswith('/sample/selected'):
+            query = parse_qs(urlparse(self.path).query)
+            index = int(query['index'][0])
+
+            tic.samples[index] = self.rfile.read(SAMPLE_SIZE)
+
+            tic.signal_update('sfx')
+
+            self.send_response(200)
+            self.end_headers()
+
+        elif self.path.startswith('/envelope/all'):
+            for index in range(ENVELOPES_COUNT):
+                tic.envelopes[index] = self.rfile.read(ENVELOPE_SIZE)
+
+            tic.signal_update('sfx')
+
+            self.send_response(200)
+            self.end_headers()
+
+        elif self.path.startswith('/envelope/selected'):
+            query = parse_qs(urlparse(self.path).query)
+            index = int(query['index'][0])
+
+            tic.envelopes[index] = self.rfile.read(ENVELOPE_SIZE)
+
+            tic.signal_update('sfx')
 
             self.send_response(200)
             self.end_headers()
