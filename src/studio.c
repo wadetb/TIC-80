@@ -707,6 +707,8 @@ bool modeHasChanges(EditorMode mode)
 		return impl.editor[impl.bank.index.map].map->server.dirty;
 	case TIC_SFX_MODE:
 		return impl.editor[impl.bank.index.sfx].sfx->server.dirty;
+	case TIC_MUSIC_MODE:
+		return impl.editor[impl.bank.index.music].music->server.dirty;
 	default:
 		return false;
 	}
@@ -1240,6 +1242,12 @@ static bool collabStreamCallback(u8* buffer, s32 size, void* data)
 	{
 		Sfx* sfx = impl.editor[impl.bank.index.sfx].sfx;
 		sfx->pull(sfx);
+	}
+
+	//if(strstr(copy, "pattern") != NULL || strstr(copy, "track") != NULL)
+	{
+		Music* music = impl.editor[impl.bank.index.music].music;
+		music->pull(music);
 	}
 
 	free(copy);

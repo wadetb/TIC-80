@@ -174,26 +174,30 @@ static void drawTopPanel(Sfx* sfx, s32 x, s32 y)
 {
 	const s32 Gap = 8*TIC_FONT_WIDTH;
 
-	u8 dirty = 0;
-	if(collabEnabled())
 	{
-		if(sfx->server.sample_diff[sfx->index])
-			dirty |= SWITCH_CURRENT_VALUE_IS_DIRTY;
+		u8 dirty = 0;
+		if(collabEnabled())
+		{
+			if(sfx->server.sample_diff[sfx->index])
+				dirty |= SWITCH_CURRENT_VALUE_IS_DIRTY;
 
-		for(s32 i = sfx->index-1; i >= 0; i--)
-			if(sfx->server.sample_diff[i])
-				dirty |= SWITCH_PRIOR_VALUE_IS_DIRTY;
+			for(s32 i = sfx->index-1; i >= 0; i--)
+				if(sfx->server.sample_diff[i])
+					dirty |= SWITCH_PRIOR_VALUE_IS_DIRTY;
 
-		for(s32 i = sfx->index+1; i < SFX_COUNT; i++)
-			if(sfx->server.sample_diff[i])
-				dirty |= SWITCH_LATER_VALUE_IS_DIRTY;
+			for(s32 i = sfx->index+1; i < SFX_COUNT; i++)
+				if(sfx->server.sample_diff[i])
+					dirty |= SWITCH_LATER_VALUE_IS_DIRTY;
+		}
+
+		drawSwitch(sfx, x, y, dirty, "IDX", sfx->index, setIndex);
 	}
 
-	drawSwitch(sfx, x, y, dirty, "IDX", sfx->index, setIndex);
-
-	tic_sample* effect = getEffect(sfx);
-
-	drawSwitch(sfx, x += Gap, y, 0, "SPD", effect->speed, setSpeed);
+	{
+		tic_sample* effect = getEffect(sfx);
+		u8 dirty = effect->speed == sfx->server.sfx.samples.data[sfx->index].speed ? 0 : SWITCH_CURRENT_VALUE_IS_DIRTY;
+		drawSwitch(sfx, x += Gap, y, dirty, "SPD", effect->speed, setSpeed);
+	}
 
 	drawStereoSwitch(sfx, x += Gap, y);
 }
@@ -227,8 +231,15 @@ static void drawLoopPanel(Sfx* sfx, s32 x, s32 y)
 	tic_sample* effect = getEffect(sfx);
 	tic_sound_loop* loop = effect->loops + sfx->canvasTab;
 
-	drawSwitch(sfx, x, y += Gap + TIC_FONT_HEIGHT, 0, "", loop->size, setLoopSize);
-	drawSwitch(sfx, x, y += Gap + TIC_FONT_HEIGHT, 0, "", loop->start, setLoopStart);
+	{
+		u8 dirty = loop->size == sfx->server.sfx.samples.data[sfx->index].loops[sfx->canvasTab].size ? 0 : SWITCH_CURRENT_VALUE_IS_DIRTY;
+		drawSwitch(sfx, x, y += Gap + TIC_FONT_HEIGHT, dirty, "", loop->size, setLoopSize);
+	}
+
+	{
+		u8 dirty = loop->start == sfx->server.sfx.samples.data[sfx->index].loops[sfx->canvasTab].start ? 0 : SWITCH_CURRENT_VALUE_IS_DIRTY;
+		drawSwitch(sfx, x, y += Gap + TIC_FONT_HEIGHT, dirty, "", loop->start, setLoopStart);
+	}
 }
 
 static tic_waveform* getWaveformById(Sfx* sfx, s32 i)

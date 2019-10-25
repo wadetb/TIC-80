@@ -44,7 +44,21 @@ SAMPLE_SIZE = SFX_TICKS * 2 + 2 + 4 # 30*2:data, 2:misc, 4:loops
 ENVELOPES_COUNT = 16
 ENVELOPE_VALUES = 32
 ENVELOPE_VALUE_BITS = 4
-ENVELOPE_SIZE = (ENVELOPE_VALUES * ENVELOPE_VALUE_BITS // BITS_IN_BYTE)
+ENVELOPE_SIZE = ENVELOPE_VALUES * ENVELOPE_VALUE_BITS // BITS_IN_BYTE
+
+TIC_SOUND_CHANNELS = 4
+
+MUSIC_PATTERNS = 60
+MUSIC_PATTERN_ROWS = 64
+TIC_PATTERN_SIZE = MUSIC_PATTERN_ROWS * 3
+
+MUSIC_TRACKS_BITS = 3
+MUSIC_TRACKS = 1 << MUSIC_TRACKS_BITS
+MUSIC_FRAMES = 16
+TRACK_PATTERN_BITS = 6
+TRACK_PATTERNS_SIZE = TRACK_PATTERN_BITS * TIC_SOUND_CHANNELS // BITS_IN_BYTE
+TIC_TRACK_SIZE = MUSIC_FRAMES * TRACK_PATTERNS_SIZE + 3
+
 
 class TIC:
     def __init__(self):
@@ -60,8 +74,11 @@ class TIC:
         self.samples = [bytearray(b'\0' * SAMPLE_SIZE) for _ in range(SFX_COUNT)]
         self.envelopes = [bytearray(b'\0' * ENVELOPE_SIZE) for _ in range(ENVELOPES_COUNT)]
 
+        self.patterns = [bytearray(b'\0' * TIC_PATTERN_SIZE) for _ in range(MUSIC_PATTERNS)]
+        self.tracks = [bytearray(b'\0' * TIC_TRACK_SIZE) for _ in range(MUSIC_TRACKS)]
+
         self.condition = threading.Condition()
-        self.update_keys = {'sprite': 0, 'flags': 0, 'palette': 0, 'map': 0, 'sfx': 0}
+        self.update_keys = {'sprite': 0, 'flags': 0, 'palette': 0, 'map': 0, 'sfx': 0, 'music': 0}
 
     def signal_update(self, key):
         with self.condition:
@@ -75,6 +92,7 @@ class TIC:
                        if keys.get(k, None) != v]
             keys.update(self.update_keys)
         return changed
+
 
 tic = TIC()
 
@@ -223,6 +241,48 @@ class CollabHandler(http.server.BaseHTTPRequestHandler):
 
             self.wfile.write(tic.envelopes[index])
 
+        elif self.path.startswith('/pattern/all'):
+            buffer = bytearray()
+            for pattern in tic.patterns:
+                buffer.extend(pattern)
+
+            self.send_response(200)
+            self.send_header('Content-Length', '{}'.format(len(buffer)))
+            self.end_headers()
+
+            self.wfile.write(buffer)
+
+        elif self.path.startswith('/pattern/selected'):
+            query = parse_qs(urlparse(self.path).query)
+            index = int(query['index'][0])
+
+            self.send_response(200)
+            self.send_header('Content-Length', '{}'.format(TIC_PATTERN_SIZE))
+            self.end_headers()
+
+            self.wfile.write(tic.patterns[index])
+
+        elif self.path.startswith('/track/all'):
+            buffer = bytearray()
+            for track in tic.tracks:
+                buffer.extend(track)
+
+            self.send_response(200)
+            self.send_header('Content-Length', '{}'.format(len(buffer)))
+            self.end_headers()
+
+            self.wfile.write(buffer)
+
+        elif self.path.startswith('/track/selected'):
+            query = parse_qs(urlparse(self.path).query)
+            index = int(query['index'][0])
+
+            self.send_response(200)
+            self.send_header('Content-Length', '{}'.format(TIC_TRACK_SIZE))
+            self.end_headers()
+
+            self.wfile.write(tic.tracks[index])
+
         else:
             self.send_response(400)
             self.end_headers()
@@ -347,6 +407,46 @@ class CollabHandler(http.server.BaseHTTPRequestHandler):
             tic.envelopes[index] = self.rfile.read(ENVELOPE_SIZE)
 
             tic.signal_update('sfx')
+
+            self.send_response(200)
+            self.end_headers()
+
+        elif self.path.startswith('/pattern/all'):
+            for index in range(MUSIC_PATTERNS):
+                tic.patterns[index] = self.rfile.read(TIC_PATTERN_SIZE)
+
+            tic.signal_update('music')
+
+            self.send_response(200)
+            self.end_headers()
+
+        elif self.path.startswith('/pattern/selected'):
+            query = parse_qs(urlparse(self.path).query)
+            index = int(query['index'][0])
+
+            tic.patterns[index] = self.rfile.read(TIC_PATTERN_SIZE)
+
+            tic.signal_update('music')
+
+            self.send_response(200)
+            self.end_headers()
+
+        elif self.path.startswith('/track/all'):
+            for index in range(MUSIC_TRACKS):
+                tic.tracks[index] = self.rfile.read(TIC_TRACK_SIZE)
+
+            tic.signal_update('music')
+
+            self.send_response(200)
+            self.end_headers()
+
+        elif self.path.startswith('/track/selected'):
+            query = parse_qs(urlparse(self.path).query)
+            index = int(query['index'][0])
+
+            tic.tracks[index] = self.rfile.read(TIC_TRACK_SIZE)
+
+            tic.signal_update('music')
 
             self.send_response(200)
             self.end_headers()
