@@ -28,9 +28,9 @@
 #define CHANNEL_COLS 8
 #define TRACKER_COLS (TIC_SOUND_CHANNELS * CHANNEL_COLS)
 
-#define SWITCH_CURRENT_VALUE_IS_DIRTY (1<<0)
-#define SWITCH_LATER_VALUE_IS_DIRTY (1<<1)
-#define SWITCH_PRIOR_VALUE_IS_DIRTY (1<<2)
+#define SWITCH_CURRENT_VALUE_IS_CHANGED (1<<0)
+#define SWITCH_LATER_VALUE_IS_CHANGED (1<<1)
+#define SWITCH_PRIOR_VALUE_IS_CHANGED (1<<2)
 
 enum
 {
@@ -170,7 +170,7 @@ static void drawEditbox(Music* music, s32 x, s32 y, u8 color, s32 value, void(*s
 	}
 }
 
-static void drawSwitch(Music* music, s32 x, s32 y, u8 dirty, const char* label, s32 value, void(*set)(Music*, s32, void* data), void* data)
+static void drawSwitch(Music* music, s32 x, s32 y, u8 changed, const char* label, s32 value, void(*set)(Music*, s32, void* data), void* data)
 {
 	static const u8 LeftArrow[] =
 	{
@@ -219,14 +219,14 @@ static void drawSwitch(Music* music, s32 x, s32 y, u8 dirty, const char* label, 
 				set(music, -1, data);
 		}
 
-		u8 color = (dirty & SWITCH_PRIOR_VALUE_IS_DIRTY) ? tic_color_yellow : 
+		u8 color = (changed & SWITCH_PRIOR_VALUE_IS_CHANGED) ? tic_color_yellow : 
 		           over ? tic_color_light_blue : tic_color_dark_gray;
 
 		drawBitIcon(rect.x, rect.y + (down ? 1 : 0), LeftArrow, color);
 	}
 
 	{
-		u8 color = (dirty & SWITCH_CURRENT_VALUE_IS_DIRTY) ? (tic_color_yellow) : (tic_color_white);
+		u8 color = (changed & SWITCH_CURRENT_VALUE_IS_CHANGED) ? (tic_color_yellow) : (tic_color_white);
 
 		char val[] = "999";
 		sprintf(val, "%02i", value);
@@ -254,7 +254,7 @@ static void drawSwitch(Music* music, s32 x, s32 y, u8 dirty, const char* label, 
 				set(music, +1, data);
 		}
 
-		u8 color = (dirty & SWITCH_LATER_VALUE_IS_DIRTY) ? tic_color_yellow : 
+		u8 color = (changed & SWITCH_LATER_VALUE_IS_CHANGED) ? tic_color_yellow : 
 		           over ? tic_color_light_blue : tic_color_dark_gray;
 
 		drawBitIcon(rect.x, rect.y + (down ? 1 : 0), RightArrow, color);
@@ -730,7 +730,7 @@ static void diff(Music *music)
 
 	for(s32 i = 0; i < MUSIC_TRACKS; i++)
 	{
-		tic_track* track = collab_data(music->collab.tracks, music->tic, i);
+		tic_track* track = (tic_track*)collab_data(music->collab.tracks, music->tic, i);
 
 		for(s32 frame = 0; frame < MUSIC_FRAMES; frame++)
 		{
@@ -1208,39 +1208,39 @@ static void setRows(Music* music, s32 delta, void* data)
 static void drawTopPanel(Music* music, s32 x, s32 y)
 {
 	tic_track* track = getTrack(music);
-	tic_track* server = collab_data(music->collab.tracks, music->tic, music->track);
+	tic_track* server = (tic_track*)collab_data(music->collab.tracks, music->tic, music->track);
 
 	{
-		u8 dirty = 0;
+		u8 changed = 0;
 		if(collabEnabled())
 		{
 			if(collab_isChanged(music->collab.tracks, music->track))
-				dirty |= SWITCH_CURRENT_VALUE_IS_DIRTY;
+				changed |= SWITCH_CURRENT_VALUE_IS_CHANGED;
 
 			for(s32 i = music->track-1; i >= 0; i--)
 				if(collab_isChanged(music->collab.tracks, i))
-					dirty |= SWITCH_PRIOR_VALUE_IS_DIRTY;
+					changed |= SWITCH_PRIOR_VALUE_IS_CHANGED;
 
 			for(s32 i = music->track+1; i < MUSIC_TRACKS; i++)
 				if(collab_isChanged(music->collab.tracks, i))
-					dirty |= SWITCH_LATER_VALUE_IS_DIRTY;
+					changed |= SWITCH_LATER_VALUE_IS_CHANGED;
 		}
 
-		drawSwitch(music, x, y, dirty, "TRACK", music->track, setIndex, NULL);
+		drawSwitch(music, x, y, changed, "TRACK", music->track, setIndex, NULL);
 	}
 
 	{
-		u8 changed = track->tempo == server->tempo ? 0 : SWITCH_CURRENT_VALUE_IS_DIRTY;
+		u8 changed = track->tempo == server->tempo ? 0 : SWITCH_CURRENT_VALUE_IS_CHANGED;
 		drawSwitch(music, x += TIC_FONT_WIDTH * 10, y, changed, "TEMPO", track->tempo + DEFAULT_TEMPO, setTempo, NULL);
 	}
 
 	{
-		u8 changed = track->speed == server->speed ? 0 : SWITCH_CURRENT_VALUE_IS_DIRTY;
+		u8 changed = track->speed == server->speed ? 0 : SWITCH_CURRENT_VALUE_IS_CHANGED;
 		drawSwitch(music, x += TIC_FONT_WIDTH * 11, y, changed, "SPD", track->speed + DEFAULT_SPEED, setSpeed, NULL);
 	}
 
 	{
-		u8 changed = track->rows == server->rows ? 0 : SWITCH_CURRENT_VALUE_IS_DIRTY;
+		u8 changed = track->rows == server->rows ? 0 : SWITCH_CURRENT_VALUE_IS_CHANGED;
 		drawSwitch(music, x += TIC_FONT_WIDTH * 8, y, changed, "ROWS", MUSIC_PATTERN_ROWS - track->rows, setRows, NULL);
 	}
 }

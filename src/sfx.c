@@ -38,11 +38,11 @@
 
 #define DEFAULT_CHANNEL 0
 
-#define SWITCH_CURRENT_VALUE_IS_DIRTY (1<<0)
-#define SWITCH_LATER_VALUE_IS_DIRTY (1<<1)
-#define SWITCH_PRIOR_VALUE_IS_DIRTY (1<<2)
+#define SWITCH_CURRENT_VALUE_IS_CHANGED (1<<0)
+#define SWITCH_LATER_VALUE_IS_CHANGED (1<<1)
+#define SWITCH_PRIOR_VALUE_IS_CHANGED (1<<2)
 
-static void drawSwitch(Sfx* sfx, s32 x, s32 y, u8 dirty, const char* label, s32 value, void(*set)(Sfx*, s32))
+static void drawSwitch(Sfx* sfx, s32 x, s32 y, u8 changed, const char* label, s32 value, void(*set)(Sfx*, s32))
 {
 	static const u8 LeftArrow[] = 
 	{
@@ -83,13 +83,13 @@ static void drawSwitch(Sfx* sfx, s32 x, s32 y, u8 dirty, const char* label, s32 
 				set(sfx, -1);
 		}
 
-		u8 color = (dirty & SWITCH_PRIOR_VALUE_IS_DIRTY) ? (tic_color_yellow) : (tic_color_dark_gray);
+		u8 color = (changed & SWITCH_PRIOR_VALUE_IS_CHANGED) ? (tic_color_yellow) : (tic_color_dark_gray);
 
 		drawBitIcon(rect.x, rect.y, LeftArrow, color);
 	}
 
 	{
-		u8 color = (dirty & SWITCH_CURRENT_VALUE_IS_DIRTY) ? (tic_color_yellow) : (tic_color_white);
+		u8 color = (changed & SWITCH_CURRENT_VALUE_IS_CHANGED) ? (tic_color_yellow) : (tic_color_white);
 
 		char val[] = "99";
 		sprintf(val, "%02i", value);
@@ -109,7 +109,7 @@ static void drawSwitch(Sfx* sfx, s32 x, s32 y, u8 dirty, const char* label, s32 
 				set(sfx, +1);
 		}
 
-		u8 color = (dirty & SWITCH_LATER_VALUE_IS_DIRTY) ? (tic_color_yellow) : (tic_color_white);
+		u8 color = (changed & SWITCH_LATER_VALUE_IS_CHANGED) ? (tic_color_yellow) : (tic_color_white);
 
 		drawBitIcon(rect.x, rect.y, RightArrow, color);
 	}
@@ -176,29 +176,29 @@ static void drawTopPanel(Sfx* sfx, s32 x, s32 y)
 	const s32 Gap = 8*TIC_FONT_WIDTH;
 
 	{
-		u8 dirty = 0;
+		u8 changed = 0;
 		if(collabEnabled())
 		{
 			if(collab_isChanged(sfx->collab.samples, sfx->index))
-				dirty |= SWITCH_CURRENT_VALUE_IS_DIRTY;
+				changed |= SWITCH_CURRENT_VALUE_IS_CHANGED;
 
 			for(s32 i = sfx->index-1; i >= 0; i--)
 				if(collab_isChanged(sfx->collab.samples, i))
-					dirty |= SWITCH_PRIOR_VALUE_IS_DIRTY;
+					changed |= SWITCH_PRIOR_VALUE_IS_CHANGED;
 
 			for(s32 i = sfx->index+1; i < SFX_COUNT; i++)
 				if(collab_isChanged(sfx->collab.samples, i))
-					dirty |= SWITCH_LATER_VALUE_IS_DIRTY;
+					changed |= SWITCH_LATER_VALUE_IS_CHANGED;
 		}
 
-		drawSwitch(sfx, x, y, dirty, "IDX", sfx->index, setIndex);
+		drawSwitch(sfx, x, y, changed, "IDX", sfx->index, setIndex);
 	}
 
 	{
 		tic_sample* effect = getEffect(sfx);
 		tic_sample* server = (tic_sample*)collab_data(sfx->collab.samples, sfx->tic, sfx->index);
-		u8 dirty = effect->speed == server->speed ? 0 : SWITCH_CURRENT_VALUE_IS_DIRTY;
-		drawSwitch(sfx, x += Gap, y, dirty, "SPD", effect->speed, setSpeed);
+		u8 changed = effect->speed == server->speed ? 0 : SWITCH_CURRENT_VALUE_IS_CHANGED;
+		drawSwitch(sfx, x += Gap, y, changed, "SPD", effect->speed, setSpeed);
 	}
 
 	drawStereoSwitch(sfx, x += Gap, y);
@@ -236,12 +236,12 @@ static void drawLoopPanel(Sfx* sfx, s32 x, s32 y)
 	tic_sound_loop* serverLoop = server->loops + sfx->canvasTab;
 
 	{
-		u8 changed = loop->size == serverLoop->size ? 0 : SWITCH_CURRENT_VALUE_IS_DIRTY;
+		u8 changed = loop->size == serverLoop->size ? 0 : SWITCH_CURRENT_VALUE_IS_CHANGED;
 		drawSwitch(sfx, x, y += Gap + TIC_FONT_HEIGHT, changed, "", loop->size, setLoopSize);
 	}
 
 	{
-		u8 changed = loop->start == serverLoop->start ? 0 : SWITCH_CURRENT_VALUE_IS_DIRTY;
+		u8 changed = loop->start == serverLoop->start ? 0 : SWITCH_CURRENT_VALUE_IS_CHANGED;
 		drawSwitch(sfx, x, y += Gap + TIC_FONT_HEIGHT, changed, "", loop->start, setLoopStart);
 	}
 }

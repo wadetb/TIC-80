@@ -1158,19 +1158,35 @@ static void drawSheetOvr(Sprite* sprite, s32 x, s32 y)
 		{
 			for(s32 i = 0; i < rect.w; i += TIC_SPRITESIZE, index++)
 			{
-				if(collab_isChanged(sprite->collab.tiles, index))
+				if(collab_isChanged(sprite->collab.tiles, index) || collab_isChanged(sprite->collab.flags, index))
 				{
-					u8 l = 0, r = 0, t = 0, b = 0;
+					bool l = false, r = false, t = false, b = false;
 
 					s32 bank_index = index % TIC_BANK_SPRITES;
 					if((bank_index % TIC_SPRITESHEET_COLS) > 0)
-						l = collab_isChanged(sprite->collab.tiles, index - 1);
+					{
+						if(collab_isChanged(sprite->collab.tiles, index - 1) ||
+						   collab_isChanged(sprite->collab.flags, index - 1))
+							l = true;
+					}
 					if((bank_index % TIC_SPRITESHEET_COLS) < TIC_SPRITESHEET_COLS - 1)
-						r = collab_isChanged(sprite->collab.tiles, index + 1);
+					{
+						if(collab_isChanged(sprite->collab.tiles, index + 1) ||
+						   collab_isChanged(sprite->collab.flags, index + 1))
+						    r = true;
+					}
 					if(bank_index >= TIC_SPRITESHEET_COLS)
-						t = collab_isChanged(sprite->collab.tiles, index - TIC_SPRITESHEET_COLS);
+					{
+						if(collab_isChanged(sprite->collab.tiles, index - TIC_SPRITESHEET_COLS) ||
+						   collab_isChanged(sprite->collab.flags, index - TIC_SPRITESHEET_COLS))
+						    t = true;
+					}
 					if(bank_index < TIC_BANK_SPRITES - TIC_SPRITESHEET_COLS)
-						b = collab_isChanged(sprite->collab.tiles, index + TIC_SPRITESHEET_COLS);
+					{
+						if(collab_isChanged(sprite->collab.tiles, index + TIC_SPRITESHEET_COLS) ||
+						   collab_isChanged(sprite->collab.flags, index + TIC_SPRITESHEET_COLS))
+						    b = true;
+					}
 
 					if(!l) sprite->tic->api.line(sprite->tic, x + i, y + j, x + i, y + j + TIC_SPRITESIZE - 1, (tic_color_yellow));
 					if(!r) sprite->tic->api.line(sprite->tic, x + i + TIC_SPRITESIZE - 1, y + j, x + i + TIC_SPRITESIZE - 1, y + j + TIC_SPRITESIZE - 1, (tic_color_yellow));
