@@ -884,12 +884,12 @@ static void drawMapOvr(Map* map)
 
 				s32 index = mapY * TIC_MAP_WIDTH + mapX;
 
-				if(collab_isChanged(map->collab, 0, index))
+				if(collab_isChanged(map->collab, index))
 				{
-					u8 l = collab_isChanged(map->collab, 0, mapY * TIC_MAP_WIDTH + ((mapX + TIC_MAP_WIDTH - 1) % TIC_MAP_WIDTH));
-					u8 r = collab_isChanged(map->collab, 0, mapY * TIC_MAP_WIDTH + ((mapX + 1) % TIC_MAP_WIDTH));
-					u8 t = collab_isChanged(map->collab, 0, mapX + ((mapY + TIC_MAP_HEIGHT - 1) % TIC_MAP_HEIGHT) * TIC_MAP_WIDTH);
-					u8 b = collab_isChanged(map->collab, 0, mapX + ((mapY + 1) % TIC_MAP_HEIGHT) * TIC_MAP_WIDTH);
+					u8 l = collab_isChanged(map->collab, mapY * TIC_MAP_WIDTH + ((mapX + TIC_MAP_WIDTH - 1) % TIC_MAP_WIDTH));
+					u8 r = collab_isChanged(map->collab, mapY * TIC_MAP_WIDTH + ((mapX + 1) % TIC_MAP_WIDTH));
+					u8 t = collab_isChanged(map->collab, mapX + ((mapY + TIC_MAP_HEIGHT - 1) % TIC_MAP_HEIGHT) * TIC_MAP_WIDTH);
+					u8 b = collab_isChanged(map->collab, mapX + ((mapY + 1) % TIC_MAP_HEIGHT) * TIC_MAP_WIDTH);
 
 					s32 sx = x - scrollX;
 					s32 sy = y - scrollY;
@@ -1066,7 +1066,7 @@ static void pushToServer(Map *map)
 
 		if(sel.w > 0 && sel.h > 0)
 			for(s32 y = sel.y, i = 0; y < sel.y+sel.h; y++)
-				collab_putRange(map->collab, map->tic, 0, y * TIC_MAP_WIDTH + sel.x, sel.w);
+				collab_putRange(map->collab, map->tic, y * TIC_MAP_WIDTH + sel.x, sel.w);
 	}
 }
 
@@ -1086,7 +1086,7 @@ static void pullFromServer(Map *map)
 
 		if(sel.w > 0 && sel.h > 0)
 			for(s32 y = sel.y, i = 0; y < sel.y+sel.h; y++)
-				collab_getRange(map->collab, map->tic, 0, y * TIC_MAP_WIDTH + sel.x, sel.w);
+				collab_getRange(map->collab, map->tic, y * TIC_MAP_WIDTH + sel.x, sel.w);
 	}
 
 	history_add(map->history);
@@ -1235,10 +1235,7 @@ void initMap(Map* map, tic_mem* tic, s32 bank)
 			.start = {0, 0},
 		},
 		.history = history_create(&tic->cart.banks[bank].map, sizeof(tic_map)),
-		.collab = collab_create(
-			tic_tool_cart_offset(&tic->cart, tic->cart.banks[bank].map.data), sizeof(u8), TIC_MAP_WIDTH * TIC_MAP_HEIGHT,
-			0, 0, 0,
-			0, 0, 0),
+		.collab = collab_create(tic_tool_cart_offset(&tic->cart, tic->cart.banks[bank].map.data), sizeof(u8), TIC_MAP_WIDTH * TIC_MAP_HEIGHT),
 		.event = onStudioEvent,
 		.pull = onPull,
 		.overline = overline,

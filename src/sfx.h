@@ -26,6 +26,8 @@
 
 typedef struct Sfx Sfx;
 
+typedef struct Collab Collab;
+
 struct Sfx
 {
 	tic_mem* tic;
@@ -60,7 +62,11 @@ struct Sfx
 	} tab;
 
 	struct History* history;
-	struct Collab* collab;
+	struct
+	{
+		Collab* waveform;
+		Collab* samples;
+	} collab;
 
 	void(*tick)(Sfx*);
 	void(*event)(Sfx*, StudioEvent);

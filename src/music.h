@@ -26,6 +26,8 @@
 
 typedef struct Music Music;
 
+typedef struct Collab Collab;
+
 struct Music
 {
 	tic_mem* tic;
@@ -70,7 +72,11 @@ struct Music
 	} tab;
 
 	struct History* history;
-	struct Collab* collab;
+
+	struct{
+		Collab* patterns;
+		Collab* tracks;
+	} collab;
 
 	void(*tick)(Music*);
 	void(*event)(Music*, StudioEvent);

@@ -705,13 +705,17 @@ bool modeHasChanges(EditorMode mode)
 	case TIC_CODE_MODE:
 		return collab_anyChanged(impl.editor[impl.bank.index.code].code->collab);
 	case TIC_SPRITE_MODE:
-		return collab_anyChanged(impl.editor[impl.bank.index.sprites].sprite->collab);
+		return collab_anyChanged(impl.editor[impl.bank.index.sprites].sprite->collab.tiles) ||
+		       collab_anyChanged(impl.editor[impl.bank.index.sprites].sprite->collab.flags) ||
+			   collab_anyChanged(impl.editor[impl.bank.index.sprites].sprite->collab.palette);
 	case TIC_MAP_MODE:
 		return collab_anyChanged(impl.editor[impl.bank.index.map].map->collab);
 	case TIC_SFX_MODE:
-		return collab_anyChanged(impl.editor[impl.bank.index.sfx].sfx->collab);
+		return collab_anyChanged(impl.editor[impl.bank.index.sfx].sfx->collab.waveform) ||
+		       collab_anyChanged(impl.editor[impl.bank.index.sfx].sfx->collab.samples);
 	case TIC_MUSIC_MODE:
-		return collab_anyChanged(impl.editor[impl.bank.index.music].music->collab);
+		return collab_anyChanged(impl.editor[impl.bank.index.music].music->collab.patterns) ||
+		       collab_anyChanged(impl.editor[impl.bank.index.music].music->collab.tracks);
 	default:
 		return false;
 	}

@@ -65,7 +65,13 @@ struct Sprite
 	}mode;
 
 	struct History* history;
-	struct Collab* collab;
+
+	struct
+	{
+		struct Collab* tiles;
+		struct Collab* flags;
+		struct Collab* palette;
+	}collab;
 	
 	void (*tick)(Sprite*);
 	void (*event)(Sprite*, StudioEvent);

@@ -1550,11 +1550,7 @@ void initCode(Code* code, tic_mem* tic, tic_code* src)
 		.tickCounter = 0,
 		.history = NULL,
 		.cursorHistory = NULL,
-		.collab = collab_create(
-			tic_tool_cart_offset(&tic->cart, tic->cart.code.data), sizeof(tic_code), 1,
-			0, 0, 0,
-			0, 0, 0
-		),
+		.collab = collab_create(tic_tool_cart_offset(&tic->cart, tic->cart.code.data), sizeof(tic_code), 1),
 		.mode = TEXT_EDIT_MODE,
 		.jump = {.line = -1},
 		.popup =

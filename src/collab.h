@@ -28,15 +28,15 @@ typedef struct tic_mem tic_mem;
 
 typedef struct Collab Collab;
 
-struct Collab* collab_create(s32 offset0, s32 size0, s32 count0, s32 offset1, s32 size1, s32 count1, s32 offset2, s32 size2, s32 count2);
+struct Collab* collab_create(s32 offset, s32 size, s32 count);
 void collab_delete(Collab* collab);
 void collab_diff(Collab *collab, tic_mem *tic);
-void* collab_data(Collab *collab, tic_mem *tic, s32 block, s32 index);
-bool collab_isChanged(Collab *collab, s32 block, s32 index);
-void collab_setChanged(Collab* collab, s32 block, s32 index, u8 value);
+void* collab_data(Collab *collab, tic_mem *tic, s32 index);
+bool collab_isChanged(Collab *collab, s32 index);
+void collab_setChanged(Collab* collab, s32 index, u8 value);
 bool collab_anyChanged(Collab *collab);
 void collab_fetch(Collab* collab, tic_mem* tic);
 void collab_put(Collab* collab, tic_mem* tic);
 void collab_get(Collab* collab, tic_mem* tic);
-void collab_putRange(Collab* collab, tic_mem* tic, s32 block, s32 first, s32 count);
-void collab_getRange(Collab* collab, tic_mem* tic, s32 block, s32 first, s32 count);
+void collab_putRange(Collab* collab, tic_mem* tic, s32 first, s32 count);
+void collab_getRange(Collab* collab, tic_mem* tic, s32 first, s32 count);

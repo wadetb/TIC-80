@@ -179,15 +179,15 @@ static void drawTopPanel(Sfx* sfx, s32 x, s32 y)
 		u8 dirty = 0;
 		if(collabEnabled())
 		{
-			if(collab_isChanged(sfx->collab, 1, sfx->index))
+			if(collab_isChanged(sfx->collab.samples, sfx->index))
 				dirty |= SWITCH_CURRENT_VALUE_IS_DIRTY;
 
 			for(s32 i = sfx->index-1; i >= 0; i--)
-				if(collab_isChanged(sfx->collab, 1, i))
+				if(collab_isChanged(sfx->collab.samples, i))
 					dirty |= SWITCH_PRIOR_VALUE_IS_DIRTY;
 
 			for(s32 i = sfx->index+1; i < SFX_COUNT; i++)
-				if(collab_isChanged(sfx->collab, 1, i))
+				if(collab_isChanged(sfx->collab.samples, i))
 					dirty |= SWITCH_LATER_VALUE_IS_DIRTY;
 		}
 
@@ -196,7 +196,7 @@ static void drawTopPanel(Sfx* sfx, s32 x, s32 y)
 
 	{
 		tic_sample* effect = getEffect(sfx);
-		tic_sample* server = (tic_sample*)collab_data(sfx->collab, sfx->tic, 1, sfx->index);
+		tic_sample* server = (tic_sample*)collab_data(sfx->collab.samples, sfx->tic, sfx->index);
 		u8 dirty = effect->speed == server->speed ? 0 : SWITCH_CURRENT_VALUE_IS_DIRTY;
 		drawSwitch(sfx, x += Gap, y, dirty, "SPD", effect->speed, setSpeed);
 	}
@@ -232,7 +232,7 @@ static void drawLoopPanel(Sfx* sfx, s32 x, s32 y)
 
 	tic_sample* effect = getEffect(sfx);
 	tic_sound_loop* loop = effect->loops + sfx->canvasTab;
-	tic_sample* server = (tic_sample*)collab_data(sfx->collab, sfx->tic, 1, sfx->index);
+	tic_sample* server = (tic_sample*)collab_data(sfx->collab.samples, sfx->tic, sfx->index);
 	tic_sound_loop* serverLoop = server->loops + sfx->canvasTab;
 
 	{
@@ -713,14 +713,15 @@ static void pushToServer(Sfx* sfx)
 
 	if(sfx->tic->api.key(sfx->tic, tic_key_shift))
 	{
-		collab_put(sfx->collab, sfx->tic);
+		collab_put(sfx->collab.waveform, sfx->tic);
+		collab_put(sfx->collab.samples, sfx->tic);
 	}
 	else
 	{
 		if(sfx->tab == SFX_ENVELOPES_TAB)
-			collab_putRange(sfx->collab, sfx->tic, 1, sfx->index, 1);
+			collab_putRange(sfx->collab.samples, sfx->tic, sfx->index, 1);
 		else
-			collab_putRange(sfx->collab, sfx->tic, 0, sfx->waveform.index, 1);
+			collab_putRange(sfx->collab.waveform, sfx->tic, sfx->waveform.index, 1);
 	}
 }
 
@@ -731,14 +732,15 @@ static void pullFromServer(Sfx* sfx)
 
 	if(sfx->tic->api.key(sfx->tic, tic_key_shift))
 	{
-		collab_get(sfx->collab, sfx->tic);
+		collab_get(sfx->collab.waveform, sfx->tic);
+		collab_get(sfx->collab.samples, sfx->tic);
 	}
 	else
 	{
 		if(sfx->tab == SFX_ENVELOPES_TAB)
-			collab_getRange(sfx->collab, sfx->tic, 1, sfx->index, 1);
+			collab_getRange(sfx->collab.samples, sfx->tic, sfx->index, 1);
 		else
-			collab_getRange(sfx->collab, sfx->tic, 0, sfx->waveform.index, 1);
+			collab_getRange(sfx->collab.waveform, sfx->tic, sfx->waveform.index, 1);
 	}
 
 	history_add(sfx->history);
@@ -747,8 +749,10 @@ static void pullFromServer(Sfx* sfx)
 
 static void onPull(Sfx *sfx)
 {
-	collab_fetch(sfx->collab, sfx->tic);
-	collab_diff(sfx->collab, sfx->tic);
+	collab_fetch(sfx->collab.waveform, sfx->tic);
+	collab_fetch(sfx->collab.samples, sfx->tic);
+	collab_diff(sfx->collab.waveform, sfx->tic);
+	collab_diff(sfx->collab.samples, sfx->tic);
 }
 
 static void processKeyboard(Sfx* sfx)
@@ -1007,7 +1011,7 @@ static void drawWaveformBar(Sfx* sfx, s32 x, s32 y)
 			sfx->tic->api.rect_border(sfx->tic, rect.x-2, rect.y-2, rect.w+4, rect.h+4, (tic_color_white));
 
 		if(collabEnabled())
-			if(collab_isChanged(sfx->collab, 0, i))
+			if(collab_isChanged(sfx->collab.waveform, i))
 				sfx->tic->api.rect_border(sfx->tic, rect.x+1, rect.y+1, rect.w-2, rect.h-2, (tic_color_yellow));
 		
 		{
@@ -1095,7 +1099,8 @@ static void tick(Sfx* sfx)
 
 	playSound(sfx);
 
-	collab_diff(sfx->collab, sfx->tic);
+	collab_diff(sfx->collab.waveform, sfx->tic);
+	collab_diff(sfx->collab.samples, sfx->tic);
 }
 
 static void onStudioEnvelopeEvent(Sfx* sfx, StudioEvent event)
@@ -1141,7 +1146,8 @@ static void onStudioEvent(Sfx* sfx, StudioEvent event)
 void initSfx(Sfx* sfx, tic_mem* tic, s32 bank)
 {
 	if(sfx->history) history_delete(sfx->history);
-	if(sfx->collab) collab_delete(sfx->collab);
+	if(sfx->collab.waveform) collab_delete(sfx->collab.waveform);
+	if(sfx->collab.samples) collab_delete(sfx->collab.samples);
 	
 	*sfx = (Sfx)
 	{
@@ -1161,10 +1167,11 @@ void initSfx(Sfx* sfx, tic_mem* tic, s32 bank)
 		.canvasTab = SFX_WAVE_TAB,
 		.tab = SFX_ENVELOPES_TAB,
 		.history = history_create(&tic->cart.banks[bank].sfx, sizeof(tic_sfx)),
-		.collab = collab_create(
-			tic_tool_cart_offset(&tic->cart, tic->cart.banks[bank].sfx.waveform.envelopes), sizeof(tic_waveform), ENVELOPES_COUNT,
-			tic_tool_cart_offset(&tic->cart, tic->cart.banks[bank].sfx.samples.data), sizeof(tic_sample), SFX_COUNT,
-			0, 0, 0),
+		.collab =
+		{
+ 			.waveform = collab_create(tic_tool_cart_offset(&tic->cart, tic->cart.banks[bank].sfx.waveform.envelopes), sizeof(tic_waveform), ENVELOPES_COUNT),
+			.samples = collab_create(tic_tool_cart_offset(&tic->cart, tic->cart.banks[bank].sfx.samples.data), sizeof(tic_sample), SFX_COUNT),
+		},
 		.event = onStudioEvent,
 		.pull = onPull,
 	};

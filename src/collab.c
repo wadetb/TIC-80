@@ -27,39 +27,27 @@
 
 typedef struct
 {
-	s32 offset;
-	s32 size;
-	s32 count;
 } CollabBlock;
 
 struct Collab
 {
-	CollabBlock blocks[MAX_COLLAB_BLOCKS];
-	u8* changedBits[MAX_COLLAB_BLOCKS];
+	s32 offset;
+	s32 size;
+	s32 count;
+	u8* changedBits;
 	bool anyChanged;
 };
 
-struct Collab* collab_create(s32 offset0, s32 size0, s32 count0, s32 offset1, s32 size1, s32 count1, s32 offset2, s32 size2, s32 count2)
+struct Collab* collab_create(s32 offset, s32 size, s32 count)
 {
 	Collab* collab = (Collab*)malloc(sizeof(Collab));
 
-	collab->blocks[0].offset = offset0;
-	collab->blocks[0].size = size0;
-	collab->blocks[0].count = count0;
-	collab->blocks[1].offset = offset1;
-	collab->blocks[1].size = size1;
-	collab->blocks[1].count = count1;
-	collab->blocks[2].offset = offset2;
-	collab->blocks[2].size = size2;
-	collab->blocks[2].count = count2;
+	collab->offset = offset;
+	collab->size = size;
+	collab->count = count;
 
-	collab->changedBits[0] = (u8*)malloc(BITARRAY_SIZE(count0));
-	collab->changedBits[1] = (u8*)malloc(BITARRAY_SIZE(count1));
-	collab->changedBits[2] = (u8*)malloc(BITARRAY_SIZE(count2));
-
-	memset(collab->changedBits[0], 0, BITARRAY_SIZE(count0));
-	memset(collab->changedBits[1], 0, BITARRAY_SIZE(count1));
-	memset(collab->changedBits[2], 0, BITARRAY_SIZE(count2));
+	collab->changedBits = (u8*)malloc(BITARRAY_SIZE(count));
+	memset(collab->changedBits, 0, BITARRAY_SIZE(count));
 
 	collab->anyChanged = false;
 
@@ -68,52 +56,43 @@ struct Collab* collab_create(s32 offset0, s32 size0, s32 count0, s32 offset1, s3
 
 void collab_delete(Collab* collab)
 {
-	free(collab->changedBits[0]);
-	free(collab->changedBits[1]);
-	free(collab->changedBits[2]);
+	free(collab->changedBits);
 }
 
 void collab_diff(Collab* collab, tic_mem* tic)
 {
 	collab->anyChanged = false;
 
-	for(s32 i = 0; i < MAX_COLLAB_BLOCKS; i++)
-	{
-		CollabBlock* block = &collab->blocks[i];
+    u8* cart = (u8*)&tic->cart + collab->offset;
+    u8* server = (u8*)&tic->collab + collab->offset;
 
-		u8* cart = (u8*)&tic->cart + block->offset;
-		u8* server = (u8*)&tic->collab + block->offset;
+    for(s32 index = 0; index < collab->count; index++)
+    {
+        bool diff = memcmp(cart, server, collab->size);
 
-		for(s32 index = 0; index < block->count; index++)
-		{
-			bool diff = memcmp(cart, server, block->size);
+        if(diff)
+            collab->anyChanged = true;
 
-			if(diff)
-				collab->anyChanged = true;
+        tic_tool_poke1(collab->changedBits, index, diff);
 
-			tic_tool_poke1(collab->changedBits[i], index, diff);
-
-			cart += block->size;
-			server += block->size;
-		}
-	}
+        cart += collab->size;
+        server += collab->size;
+    }
 }
 
-void* collab_data(Collab *collab, tic_mem *tic, s32 block, s32 index)
+void* collab_data(Collab *collab, tic_mem *tic, s32 index)
 {
-    s32 offset = collab->blocks[block].offset;
-    s32 size = collab->blocks[block].size * collab->blocks[block].count;
-    return (u8*)&tic->collab + offset;
+    return (u8*)&tic->collab + collab->offset + collab->size * index;
 }
 
-bool collab_isChanged(Collab* collab, s32 block, s32 index)
+bool collab_isChanged(Collab* collab, s32 index)
 {
-	return tic_tool_peek1(collab->changedBits[block], index);
+	return tic_tool_peek1(collab->changedBits, index);
 }
 
-void collab_setChanged(Collab* collab, s32 block, s32 index, u8 value)
+void collab_setChanged(Collab* collab, s32 index, u8 value)
 {
-	tic_tool_poke1(collab->changedBits[block], index, value);
+	tic_tool_poke1(collab->changedBits, index, value);
 }
 
 bool collab_anyChanged(Collab* collab)
@@ -123,83 +102,52 @@ bool collab_anyChanged(Collab* collab)
 
 void collab_fetch(Collab* collab, tic_mem* tic)
 {
-	for (s32 i = 0; i < MAX_COLLAB_BLOCKS; i++)
-	{
-		if(collab->blocks[i].count)
-		{
-			s32 offset = collab->blocks[i].offset;
-			s32 size = collab->blocks[i].size * collab->blocks[i].count;
-			u8* data = (u8*)&tic->collab + offset;
+    u8* data = (u8*)&tic->collab + collab->offset;
+    s32 size = collab->size * collab->count;
 
-			char url[1024];
-			snprintf(url, sizeof(url), "/data?offset=%d&size=%d", offset, size);
-			getCollabData(url, data, size);
-		}
-	}
+    char url[1024];
+    snprintf(url, sizeof(url), "/data?offset=%d&size=%d", collab->offset, size);
+    getCollabData(url, data, size);
 }
 
 void collab_put(Collab* collab, tic_mem* tic)
 {
-	for (s32 i = 0; i < MAX_COLLAB_BLOCKS; i++)
-	{
-		if(collab->blocks[i].count)
-		{
-			s32 offset = collab->blocks[i].offset;
-			s32 size = collab->blocks[i].size * collab->blocks[i].count;
-			u8* data = (u8*)&tic->cart + offset;
+    u8* data = (u8*)&tic->cart + collab->offset;
+    s32 size = collab->size * collab->count;
 
-			char url[1024];
-			snprintf(url, sizeof(url), "/data?offset=%d&size=%d", offset, size);
-			putCollabData(url, data, size);
-		}
-	}
+    char url[1024];
+    snprintf(url, sizeof(url), "/data?offset=%d&size=%d", collab->offset, size);
+    putCollabData(url, data, size);
 }
 
 void collab_get(Collab* collab, tic_mem* tic)
 {
-	for (s32 i = 0; i < MAX_COLLAB_BLOCKS; i++)
-	{
-		if(collab->blocks[i].count)
-		{
-			s32 offset = collab->blocks[i].offset;
-			s32 size = collab->blocks[i].size * collab->blocks[i].count;
-			u8* data = (u8*)&tic->cart + offset;
+    u8* data = (u8*)&tic->cart + collab->offset;
+    s32 size = collab->size * collab->count;
 
-			char url[1024];
-			snprintf(url, sizeof(url), "/data?offset=%d&size=%d", offset, size);
-			getCollabData(url, data, size);
-		}
-	}
+    char url[1024];
+    snprintf(url, sizeof(url), "/data?offset=%d&size=%d", collab->offset, size);
+    getCollabData(url, data, size);
 }
 
-void collab_putRange(Collab* collab, tic_mem* tic, s32 block, s32 first, s32 count)
+void collab_putRange(Collab* collab, tic_mem* tic, s32 first, s32 count)
 {
-    CollabBlock* bl = &collab->blocks[block];
+    s32 offset = collab->offset + collab->size * first;
+    s32 size = count * collab->size;
+    u8* data = (u8*)&tic->cart + offset;
 
-    if(bl->count)
-    {
-        s32 offset = bl->offset + first * bl->size;
-        s32 size = count * bl->size;
-        u8* data = (u8*)&tic->cart + offset;
-
-        char url[1024];
-        snprintf(url, sizeof(url), "/data?offset=%d&size=%d", offset, size);
-        putCollabData(url, data, size);
-    }
+    char url[1024];
+    snprintf(url, sizeof(url), "/data?offset=%d&size=%d", offset, size);
+    putCollabData(url, data, size);
 }
 
-void collab_getRange(Collab* collab, tic_mem* tic, s32 block, s32 first, s32 count)
+void collab_getRange(Collab* collab, tic_mem* tic, s32 first, s32 count)
 {
-    CollabBlock* bl = &collab->blocks[block];
+    s32 offset = collab->offset + collab->size * first;
+    s32 size = count * collab->size;
+    u8* data = (u8*)&tic->cart + offset;
 
-    if(bl->count)
-    {
-        s32 offset = bl->offset + first * bl->size;
-        s32 size = count * bl->size;
-        u8* data = (u8*)&tic->cart + offset;
-
-        char url[1024];
-        snprintf(url, sizeof(url), "/data?offset=%d&size=%d", offset, size);
-        getCollabData(url, data, size);
-    }
+    char url[1024];
+    snprintf(url, sizeof(url), "/data?offset=%d&size=%d", offset, size);
+    getCollabData(url, data, size);
 }

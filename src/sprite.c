@@ -1158,19 +1158,19 @@ static void drawSheetOvr(Sprite* sprite, s32 x, s32 y)
 		{
 			for(s32 i = 0; i < rect.w; i += TIC_SPRITESIZE, index++)
 			{
-				if(collab_isChanged(sprite->collab, 0, index))
+				if(collab_isChanged(sprite->collab.tiles, index))
 				{
 					u8 l = 0, r = 0, t = 0, b = 0;
 
 					s32 bank_index = index % TIC_BANK_SPRITES;
 					if((bank_index % TIC_SPRITESHEET_COLS) > 0)
-						l = collab_isChanged(sprite->collab, 0, index - 1);
+						l = collab_isChanged(sprite->collab.tiles, index - 1);
 					if((bank_index % TIC_SPRITESHEET_COLS) < TIC_SPRITESHEET_COLS - 1)
-						r = collab_isChanged(sprite->collab, 0, index + 1);
+						r = collab_isChanged(sprite->collab.tiles, index + 1);
 					if(bank_index >= TIC_SPRITESHEET_COLS)
-						t = collab_isChanged(sprite->collab, 0, index - TIC_SPRITESHEET_COLS);
+						t = collab_isChanged(sprite->collab.tiles, index - TIC_SPRITESHEET_COLS);
 					if(bank_index < TIC_BANK_SPRITES - TIC_SPRITESHEET_COLS)
-						b = collab_isChanged(sprite->collab, 0, index + TIC_SPRITESHEET_COLS);
+						b = collab_isChanged(sprite->collab.tiles, index + TIC_SPRITESHEET_COLS);
 
 					if(!l) sprite->tic->api.line(sprite->tic, x + i, y + j, x + i, y + j + TIC_SPRITESIZE - 1, (tic_color_yellow));
 					if(!r) sprite->tic->api.line(sprite->tic, x + i + TIC_SPRITESIZE - 1, y + j, x + i + TIC_SPRITESIZE - 1, y + j + TIC_SPRITESIZE - 1, (tic_color_yellow));
@@ -1512,14 +1512,16 @@ static void pushToServer(Sprite* sprite)
 
 	if(sprite->tic->api.key(sprite->tic, tic_key_shift))
 	{
-		collab_put(sprite->collab, sprite->tic);
+		collab_put(sprite->collab.tiles, sprite->tic);
+		collab_put(sprite->collab.flags, sprite->tic);
+		collab_put(sprite->collab.palette, sprite->tic);
 	}
 	else
 	{
 		for(s32 y = 0, i = 0; y < sprite->size / TIC_SPRITESIZE; y++)
 		{
-			collab_putRange(sprite->collab, sprite->tic, 0, sprite->index + y * TIC_SPRITESHEET_COLS, sprite->size / TIC_SPRITESIZE);
-			collab_putRange(sprite->collab, sprite->tic, 1, sprite->index + y * TIC_SPRITESHEET_COLS, sprite->size / TIC_SPRITESIZE);
+			collab_putRange(sprite->collab.tiles, sprite->tic, sprite->index + y * TIC_SPRITESHEET_COLS, sprite->size / TIC_SPRITESIZE);
+			collab_putRange(sprite->collab.flags, sprite->tic, sprite->index + y * TIC_SPRITESHEET_COLS, sprite->size / TIC_SPRITESIZE);
 		}
 	}
 }
@@ -1531,14 +1533,16 @@ static void pullFromServer(Sprite* sprite)
 
 	if(sprite->tic->api.key(sprite->tic, tic_key_shift))
 	{
-		collab_get(sprite->collab, sprite->tic);
+		collab_get(sprite->collab.tiles, sprite->tic);
+		collab_get(sprite->collab.flags, sprite->tic);
+		collab_get(sprite->collab.palette, sprite->tic);
 	}
 	else
 	{
 		for(s32 y = 0, i = 0; y < sprite->size / TIC_SPRITESIZE; y++)
 		{
-			collab_getRange(sprite->collab, sprite->tic, 0, sprite->index + y * TIC_SPRITESHEET_COLS, sprite->size / TIC_SPRITESIZE);
-			collab_getRange(sprite->collab, sprite->tic, 1, sprite->index + y * TIC_SPRITESHEET_COLS, sprite->size / TIC_SPRITESIZE);
+			collab_getRange(sprite->collab.tiles, sprite->tic, sprite->index + y * TIC_SPRITESHEET_COLS, sprite->size / TIC_SPRITESIZE);
+			collab_getRange(sprite->collab.flags, sprite->tic, sprite->index + y * TIC_SPRITESHEET_COLS, sprite->size / TIC_SPRITESIZE);
 		}
 	}
 
@@ -1547,8 +1551,12 @@ static void pullFromServer(Sprite* sprite)
 
 static void onPull(Sprite *sprite)
 {
-	collab_fetch(sprite->collab, sprite->tic);
-	collab_diff(sprite->collab, sprite->tic);
+	collab_fetch(sprite->collab.tiles, sprite->tic);
+	collab_fetch(sprite->collab.flags, sprite->tic);
+	collab_fetch(sprite->collab.palette, sprite->tic);
+	collab_diff(sprite->collab.tiles, sprite->tic);
+	collab_diff(sprite->collab.flags, sprite->tic);
+	collab_diff(sprite->collab.palette, sprite->tic);
 }
 
 static void upSprite(Sprite* sprite)
@@ -1776,7 +1784,9 @@ static void tick(Sprite* sprite)
 	drawSpriteToolbar(sprite);
 	drawToolbar(sprite->tic, (tic_color_gray), false);
 
-	collab_diff(sprite->collab, sprite->tic);
+	collab_diff(sprite->collab.tiles, sprite->tic);
+	collab_diff(sprite->collab.flags, sprite->tic);
+	collab_diff(sprite->collab.palette, sprite->tic);
 
 	sprite->tickCounter++;
 }
@@ -1818,7 +1828,9 @@ void initSprite(Sprite* sprite, tic_mem* tic, s32 bank)
 	if(sprite->select.back == NULL) sprite->select.back = (u8*)malloc(CANVAS_SIZE*CANVAS_SIZE);
 	if(sprite->select.front == NULL) sprite->select.front = (u8*)malloc(CANVAS_SIZE*CANVAS_SIZE);
 	if(sprite->history) history_delete(sprite->history);
-	if(sprite->collab) collab_delete(sprite->collab);
+	if(sprite->collab.tiles) collab_delete(sprite->collab.tiles);
+	if(sprite->collab.flags) collab_delete(sprite->collab.flags);
+	if(sprite->collab.palette) collab_delete(sprite->collab.palette);
 	
 	*sprite = (Sprite)
 	{
@@ -1843,10 +1855,12 @@ void initSprite(Sprite* sprite, tic_mem* tic, s32 bank)
 		},
 		.mode = SPRITE_DRAW_MODE,
 		.history = history_create(&tic->cart.banks[bank].tiles, TIC_SPRITES * sizeof(tic_tile)),
-		.collab = collab_create(
-			tic_tool_cart_offset(&tic->cart, tic->cart.banks[bank].tiles.data), sizeof(tic_tile), TIC_SPRITES,
-			tic_tool_cart_offset(&tic->cart, tic->cart.banks[bank].flags.data), sizeof(u8), TIC_SPRITES,
-			tic_tool_cart_offset(&tic->cart, tic->cart.banks[bank].palette.data), sizeof(tic_rgb), TIC_PALETTE_SIZE),
+		.collab = 
+		{
+			.tiles = collab_create(tic_tool_cart_offset(&tic->cart, tic->cart.banks[bank].tiles.data), sizeof(tic_tile), TIC_SPRITES),
+			.flags = collab_create(tic_tool_cart_offset(&tic->cart, tic->cart.banks[bank].flags.data), sizeof(u8), TIC_SPRITES),
+			.palette = collab_create(tic_tool_cart_offset(&tic->cart, tic->cart.banks[bank].palette.data), sizeof(tic_rgb), TIC_PALETTE_SIZE),
+		},
 		.event = onStudioEvent,
 		.pull = onPull,
 		.overline = overline,
