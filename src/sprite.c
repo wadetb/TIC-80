@@ -1160,26 +1160,22 @@ static void drawSheetOvr(Sprite* sprite, s32 x, s32 y)
 			{
 				if(collab_isChanged(sprite->collab, 0, index))
 				{
-					u8 left = 0, right = 0, top = 0, bottom = 0;
+					u8 l = 0, r = 0, t = 0, b = 0;
 
 					s32 bank_index = index % TIC_BANK_SPRITES;
 					if((bank_index % TIC_SPRITESHEET_COLS) > 0)
-						left = collab_isChanged(sprite->collab, 0, index - 1);
+						l = collab_isChanged(sprite->collab, 0, index - 1);
 					if((bank_index % TIC_SPRITESHEET_COLS) < TIC_SPRITESHEET_COLS - 1)
-						right = collab_isChanged(sprite->collab, 0, index + 1);
+						r = collab_isChanged(sprite->collab, 0, index + 1);
 					if(bank_index >= TIC_SPRITESHEET_COLS)
-						top = collab_isChanged(sprite->collab, 0, index - TIC_SPRITESHEET_COLS);
+						t = collab_isChanged(sprite->collab, 0, index - TIC_SPRITESHEET_COLS);
 					if(bank_index < TIC_BANK_SPRITES - TIC_SPRITESHEET_COLS)
-						top = collab_isChanged(sprite->collab, 0, index + TIC_SPRITESHEET_COLS);
+						b = collab_isChanged(sprite->collab, 0, index + TIC_SPRITESHEET_COLS);
 
-					if(!left)
-						sprite->tic->api.line(sprite->tic, x + i, y + j, x + i, y + j + TIC_SPRITESIZE - 1, (tic_color_yellow));
-					if(!right)
-						sprite->tic->api.line(sprite->tic, x + i + TIC_SPRITESIZE - 1, y + j, x + i + TIC_SPRITESIZE - 1, y + j + TIC_SPRITESIZE - 1, (tic_color_yellow));
-					if(!top)
-						sprite->tic->api.line(sprite->tic, x + i, y + j, x + i + TIC_SPRITESIZE - 1, y + j, (tic_color_yellow));
-					if(!bottom)
-						sprite->tic->api.line(sprite->tic, x + i, y + j + TIC_SPRITESIZE - 1, x + i + TIC_SPRITESIZE - 1, y + j + TIC_SPRITESIZE - 1, (tic_color_yellow));
+					if(!l) sprite->tic->api.line(sprite->tic, x + i, y + j, x + i, y + j + TIC_SPRITESIZE - 1, (tic_color_yellow));
+					if(!r) sprite->tic->api.line(sprite->tic, x + i + TIC_SPRITESIZE - 1, y + j, x + i + TIC_SPRITESIZE - 1, y + j + TIC_SPRITESIZE - 1, (tic_color_yellow));
+					if(!t) sprite->tic->api.line(sprite->tic, x + i, y + j, x + i + TIC_SPRITESIZE - 1, y + j, (tic_color_yellow));
+					if(!b) sprite->tic->api.line(sprite->tic, x + i, y + j + TIC_SPRITESIZE - 1, x + i + TIC_SPRITESIZE - 1, y + j + TIC_SPRITESIZE - 1, (tic_color_yellow));
 				}
 			}
 		}

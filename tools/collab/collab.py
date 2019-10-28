@@ -43,7 +43,7 @@ class CollabHandler(http.server.BaseHTTPRequestHandler):
             self.send_response(200)
             self.end_headers()
             code = 'I' if tic.initplz else '_'
-            self.wfile.write(code)
+            self.wfile.write(code.encode())
             self.wfile.write(tic.greeting.encode())
 
         elif self.path == '/watch':
