@@ -59,9 +59,12 @@ TRACK_PATTERN_BITS = 6
 TRACK_PATTERNS_SIZE = TRACK_PATTERN_BITS * TIC_SOUND_CHANNELS // BITS_IN_BYTE
 TIC_TRACK_SIZE = MUSIC_FRAMES * TRACK_PATTERNS_SIZE + 3
 
+TIC_CODE_SIZE = 64 * 1024
+
 
 class TIC:
     def __init__(self):
+        self.initplz = True
         self.greeting = 'welcome to collab :)'
 
         self.tiles = [bytearray(b'\0' * (TIC_SPRITESIZE * TIC_SPRITESIZE * TIC_PALETTE_BPP // BITS_IN_BYTE)) 
@@ -77,8 +80,10 @@ class TIC:
         self.patterns = [bytearray(b'\0' * TIC_PATTERN_SIZE) for _ in range(MUSIC_PATTERNS)]
         self.tracks = [bytearray(b'\0' * TIC_TRACK_SIZE) for _ in range(MUSIC_TRACKS)]
 
+        self.code = bytearray(b'\0' * TIC_CODE_SIZE)
+
         self.condition = threading.Condition()
-        self.update_keys = {'sprite': 0, 'flags': 0, 'palette': 0, 'map': 0, 'sfx': 0, 'music': 0}
+        self.update_keys = {'sprite': 0, 'flags': 0, 'palette': 0, 'map': 0, 'sfx': 0, 'music': 0, 'code': 0, 'exit': 0}
 
     def signal_update(self, key):
         with self.condition:
@@ -102,14 +107,14 @@ class CollabHandler(http.server.BaseHTTPRequestHandler):
         if self.path == '/':
             self.send_response(200)
             self.end_headers()
+            code = 'I' if tic.initplz else '_'
+            self.wfile.write(code)
             self.wfile.write(tic.greeting.encode())
 
         elif self.path == '/watch':
             self.send_response(200)
             self.end_headers()
 
-            print("GOT WATCHER")
-            
             keys = {}
             while True:
                 changed = tic.wait_update(keys)
@@ -283,6 +288,13 @@ class CollabHandler(http.server.BaseHTTPRequestHandler):
 
             self.wfile.write(tic.tracks[index])
 
+        elif self.path.startswith('/code/all'):
+            self.send_response(200)
+            self.send_header('Content-Length', '{}'.format(TIC_CODE_SIZE))
+            self.end_headers()
+
+            self.wfile.write(tic.code)
+
         else:
             self.send_response(400)
             self.end_headers()
@@ -451,6 +463,14 @@ class CollabHandler(http.server.BaseHTTPRequestHandler):
             self.send_response(200)
             self.end_headers()
 
+        elif self.path.startswith('/code/all'):
+            tic.code = bytearray(self.rfile.read(TIC_CODE_SIZE))
+
+            tic.signal_update('code')
+
+            self.send_response(200)
+            self.end_headers()
+
         else:
             self.send_response(400)
             self.end_headers()
@@ -468,3 +488,4 @@ try:
 except KeyboardInterrupt:
     print('Shutting down server')
     server.socket.close()
+    tic.signal_update('exit')

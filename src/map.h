@@ -24,6 +24,8 @@
 
 #include "studio.h"
 
+typedef struct Collab Collab;
+
 typedef struct Map Map;
 
 struct Map
@@ -79,13 +81,7 @@ struct Map
 	u8* paste;
 
 	struct History* history;
-
-	struct
-	{
-		bool dirty;
-		u8 diff[TIC_MAP_WIDTH * TIC_MAP_HEIGHT];
-		tic_map map;
-	} server;
+	struct Collab* collab;
 	
 	void (*tick)(Map*);
 	void (*event)(Map*, StudioEvent);
@@ -94,4 +90,4 @@ struct Map
 	void (*overline)(tic_mem* tic, void* data);
 };
 
-void initMap(Map*, tic_mem*, tic_map* src);
+void initMap(Map*, tic_mem*, s32 bank);

@@ -114,7 +114,7 @@ void initWorld(World* world, tic_mem* tic, Map* map)
 
 		if(collabEnabled())
 		{
-			if(map->server.diff[i])
+			if(collab_isChanged(map->collab, 0, i))
 				tic_tool_poke4(world->preview, i, (tic_color_yellow));
 		}
 	}

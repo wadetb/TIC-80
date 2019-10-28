@@ -22,93 +22,21 @@
 
 #pragma once
 
-#include "studio.h"
+#include <tic80_types.h>
 
-typedef struct Code Code;
-typedef struct OutlineItem OutlineItem;
+typedef struct tic_mem tic_mem;
 
 typedef struct Collab Collab;
 
-struct Code
-{
-	tic_mem* tic;
-
-	char* src;
-
-	struct
-	{
-		struct
-		{
-			char* position;
-			char* selection;
-			s32 column;
-		};
-
-		char* mouseDownPosition;
-		s32 delay;
-	} cursor;
-
-	tic_rect rect;
-
-	struct
-	{
-		s32 x;
-		s32 y;
-
-		tic_point start;
-
-		bool active;
-		bool gesture;
-
-	} scroll;
-
-	u8 colorBuffer[TIC_CODE_SIZE];
-
-	char status[STUDIO_TEXT_BUFFER_WIDTH+1];
-
-	u32 tickCounter;
-
-	struct History* history;
-	struct History* cursorHistory;
-
-	Collab *collab;
-
-	enum
-	{
-		TEXT_RUN_CODE,
-		TEXT_EDIT_MODE,
-		TEXT_FIND_MODE,
-		TEXT_GOTO_MODE,
-		TEXT_OUTLINE_MODE,
-	} mode;
-
-	struct
-	{
-		char text[STUDIO_TEXT_BUFFER_WIDTH - sizeof "FIND:"];
-
-		char* prevPos;
-		char* prevSel;
-	} popup;
-
-	struct
-	{
-		s32 line;
-	} jump;
-
-	struct
-	{
-		OutlineItem* items;
-
-		s32 index;
-	} outline;
-
-	bool altFont;
-
-	void(*tick)(Code*);
-	void(*escape)(Code*);
-	void(*event)(Code*, StudioEvent);
-	void(*pull)(Code*);
-	void(*update)(Code*);
-};
-
-void initCode(Code*, tic_mem*, tic_code* src);
+struct Collab* collab_create(s32 offset0, s32 size0, s32 count0, s32 offset1, s32 size1, s32 count1, s32 offset2, s32 size2, s32 count2);
+void collab_delete(Collab* collab);
+void collab_diff(Collab *collab, tic_mem *tic);
+void* collab_data(Collab *collab, tic_mem *tic, s32 block, s32 index);
+bool collab_isChanged(Collab *collab, s32 block, s32 index);
+void collab_setChanged(Collab* collab, s32 block, s32 index, u8 value);
+bool collab_anyChanged(Collab *collab);
+void collab_fetch(Collab* collab, tic_mem* tic);
+void collab_put(Collab* collab, tic_mem* tic);
+void collab_get(Collab* collab, tic_mem* tic);
+void collab_putRange(Collab* collab, tic_mem* tic, s32 block, s32 first, s32 count);
+void collab_getRange(Collab* collab, tic_mem* tic, s32 block, s32 first, s32 count);

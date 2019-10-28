@@ -1530,13 +1530,13 @@ static void onConsoleCollabCommand(Console* console, const char* param)
 	if(param && strlen(param))
 	{
 		s32 size;
-		void *buffer = getSystem()->getUrlRequest(param, &size);
+		char *buffer = (char*)getSystem()->getUrlRequest(param, &size);
 		if(buffer && size)
 		{
-			setCollabUrl(param);
-
+			setCollabUrl(param, buffer[0] == 'I');
+			
 			char welcome[1024];
-			snprintf(welcome, sizeof(welcome), "\n%.*s", size, (char*)buffer);
+			snprintf(welcome, sizeof(welcome), "\n%.*s", size, buffer + 1);
 			printFront(console, welcome);
 		}
 		else printBack(console, "\nfailed to connect");

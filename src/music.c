@@ -21,6 +21,7 @@
 // SOFTWARE.
 
 #include "music.h"
+#include "collab.h"
 #include "history.h"
 
 #define TRACKER_ROWS (MUSIC_PATTERN_ROWS / 4)
@@ -675,14 +676,11 @@ static void pushToServer(Music* music)
 
 	if(music->tic->api.key(music->tic, tic_key_shift))
 	{
-		putCollabData("/pattern/all", &music->src->patterns, sizeof(tic_patterns));
-		putCollabData("/track/all", &music->src->tracks, sizeof(tic_tracks));
+		collab_put(music->collab, music->tic);
 	}
 	else
 	{
-		char path[1024];
-		snprintf(path, sizeof(path), "/track/selected?index=%d", music->track);
-		putCollabData(path, &music->src->tracks.data[music->track], sizeof(tic_track)); 
+		collab_putRange(music->collab, music->tic, 1, music->track, 1);
 
 		for (s32 frame = 0; frame < MUSIC_FRAMES; frame++)
 		{
@@ -690,10 +688,7 @@ static void pushToServer(Music* music)
 			{
 				s32 patternId = tic_tool_get_pattern_id(getTrack(music), frame, channel);
 				if(patternId)
-				{
-					snprintf(path, sizeof(path), "/pattern/selected?index=%d", patternId - PATTERN_START);
-					putCollabData(path, &music->src->patterns.data[patternId - PATTERN_START], sizeof(tic_track_pattern));
-				}
+					collab_putRange(music->collab, music->tic, 0, patternId - PATTERN_START, 1);
 			}
 		}
 	}
@@ -706,14 +701,11 @@ static void pullFromServer(Music* music)
 
 	if(music->tic->api.key(music->tic, tic_key_shift))
 	{
-		getCollabData("/pattern/all", &music->src->patterns, sizeof(tic_patterns));
-		getCollabData("/track/all", &music->src->tracks, sizeof(tic_tracks));
+		collab_get(music->collab, music->tic);
 	}
 	else
 	{
-		char path[1024];
-		snprintf(path, sizeof(path), "/track/selected?index=%d", music->track);
-		getCollabData(path, &music->src->tracks.data[music->track], sizeof(tic_track)); 
+		collab_putRange(music->collab, music->tic, 1, music->track, 1);
 
 		for (s32 frame = 0; frame < MUSIC_FRAMES; frame++)
 		{
@@ -721,10 +713,7 @@ static void pullFromServer(Music* music)
 			{
 				s32 patternId = tic_tool_get_pattern_id(getTrack(music), frame, channel);
 				if(patternId)
-				{
-					snprintf(path, sizeof(path), "/pattern/selected?index=%d", patternId - PATTERN_START);
-					getCollabData(path, &music->src->patterns.data[patternId - PATTERN_START], sizeof(tic_track_pattern));
-				}
+					collab_getRange(music->collab, music->tic, 0, patternId - PATTERN_START, 1);
 			}
 		}
 	}
@@ -734,43 +723,27 @@ static void pullFromServer(Music* music)
 
 static void diff(Music *music)
 {
-	music->server.dirty = false;
+	collab_diff(music->collab, music->tic);
 
-	if(collabEnabled())
+	for(s32 i = 0; i < MUSIC_TRACKS; i++)
 	{
-		for(s32 i = 0; i < MUSIC_PATTERNS; i++)
-		{
-			bool diff = memcmp(&music->src->patterns.data[i], &music->server.music.patterns.data[i], sizeof(tic_track_pattern)) != 0;
-			music->server.pattern_diff[i] = diff;
-			if(diff)
-				music->server.dirty = true;
-		}
+		tic_track* track = collab_data(music->collab, music->tic, 1, i);
 
-		for(s32 i = 0; i < MUSIC_TRACKS; i++)
+		for(s32 frame = 0; frame < MUSIC_FRAMES; frame++)
 		{
-			bool diff = memcmp(&music->src->tracks.data[i], &music->server.music.tracks.data[i], sizeof(tic_track)) != 0;
-
-			for(s32 frame = 0; frame < MUSIC_FRAMES; frame++)
+			for(s32 channel = 0; channel < TIC_SOUND_CHANNELS; channel++)
 			{
-				for(s32 channel = 0; channel < TIC_SOUND_CHANNELS; channel++)
-				{
-					s32 patternId = tic_tool_get_pattern_id(&music->server.music.tracks.data[i], frame, channel);
-					if(patternId && music->server.pattern_diff[patternId - PATTERN_START])
-						diff = true;
-				}
+				s32 patternId = tic_tool_get_pattern_id(track, frame, channel);
+				if(patternId && collab_isChanged(music->collab, 0, patternId - PATTERN_START))
+					collab_setChanged(music->collab, 0, i, true);
 			}
-
-			music->server.track_diff[i] = diff;
-			if(diff)
-				music->server.dirty = true;
 		}
 	}
 }
 
 static void onPull(Music *music)
 {
-	getCollabData("/track/all", &music->server.music.tracks, sizeof(tic_tracks));
-	getCollabData("/pattern/all", &music->server.music.patterns, sizeof(tic_patterns));
+	collab_fetch(music->collab, music->tic);
 	diff(music);
 }
 
@@ -1231,20 +1204,21 @@ static void setRows(Music* music, s32 delta, void* data)
 static void drawTopPanel(Music* music, s32 x, s32 y)
 {
 	tic_track* track = getTrack(music);
+	tic_track* server = collab_data(music->collab, music->tic, 1, music->track);
 
 	{
 		u8 dirty = 0;
 		if(collabEnabled())
 		{
-			if(music->server.track_diff[music->track])
+			if(collab_isChanged(music->collab, 1, music->track))
 				dirty |= SWITCH_CURRENT_VALUE_IS_DIRTY;
 
 			for(s32 i = music->track-1; i >= 0; i--)
-				if(music->server.track_diff[i])
+				if(collab_isChanged(music->collab, 1, i))
 					dirty |= SWITCH_PRIOR_VALUE_IS_DIRTY;
 
 			for(s32 i = music->track+1; i < MUSIC_TRACKS; i++)
-				if(music->server.track_diff[i])
+				if(collab_isChanged(music->collab, 1, i))
 					dirty |= SWITCH_LATER_VALUE_IS_DIRTY;
 		}
 
@@ -1252,18 +1226,18 @@ static void drawTopPanel(Music* music, s32 x, s32 y)
 	}
 
 	{
-		u8 dirty = track->tempo == music->server.music.tracks.data[music->track].tempo ? 0 : SWITCH_CURRENT_VALUE_IS_DIRTY;
-		drawSwitch(music, x += TIC_FONT_WIDTH * 10, y, dirty, "TEMPO", track->tempo + DEFAULT_TEMPO, setTempo, NULL);
+		u8 changed = track->tempo == server->tempo ? 0 : SWITCH_CURRENT_VALUE_IS_DIRTY;
+		drawSwitch(music, x += TIC_FONT_WIDTH * 10, y, changed, "TEMPO", track->tempo + DEFAULT_TEMPO, setTempo, NULL);
 	}
 
 	{
-		u8 dirty = track->speed == music->server.music.tracks.data[music->track].speed ? 0 : SWITCH_CURRENT_VALUE_IS_DIRTY;
-		drawSwitch(music, x += TIC_FONT_WIDTH * 11, y, dirty, "SPD", track->speed + DEFAULT_SPEED, setSpeed, NULL);
+		u8 changed = track->speed == server->speed ? 0 : SWITCH_CURRENT_VALUE_IS_DIRTY;
+		drawSwitch(music, x += TIC_FONT_WIDTH * 11, y, changed, "SPD", track->speed + DEFAULT_SPEED, setSpeed, NULL);
 	}
 
 	{
-		u8 dirty = track->rows == music->server.music.tracks.data[music->track].rows ? 0 : SWITCH_CURRENT_VALUE_IS_DIRTY;
-		drawSwitch(music, x += TIC_FONT_WIDTH * 8, y, dirty, "ROWS", MUSIC_PATTERN_ROWS - track->rows, setRows, NULL);
+		u8 changed = track->rows == server->rows ? 0 : SWITCH_CURRENT_VALUE_IS_DIRTY;
+		drawSwitch(music, x += TIC_FONT_WIDTH * 8, y, changed, "ROWS", MUSIC_PATTERN_ROWS - track->rows, setRows, NULL);
 	}
 }
 
@@ -1322,12 +1296,13 @@ static void drawTrackerFrames(Music* music, s32 x, s32 y)
 
 		if(collabEnabled())
 		{
+			tic_track* serverTrack = (tic_track*)collab_data(music->collab, music->tic, 1, music->track);
 			for(s32 channel = 0; channel < TIC_SOUND_CHANNELS; channel++)
 			{
 				s32 patternId = tic_tool_get_pattern_id(getTrack(music), i, channel);
-				if(patternId != tic_tool_get_pattern_id(&music->server.music.tracks.data[music->track], i, channel))
+				if(patternId != tic_tool_get_pattern_id(serverTrack, i, channel))
 					color = tic_color_yellow;
-				else if(patternId && music->server.pattern_diff[patternId - PATTERN_START])
+				else if(patternId && collab_isChanged(music->collab, 0, patternId - PATTERN_START))
 					color = tic_color_yellow;
 			}
 		}
@@ -1498,7 +1473,7 @@ static void drawTrackerChannel(Music* music, s32 x, s32 y, s32 channel)
 	if(collabEnabled())
 	{
 		s32 patternId = tic_tool_get_pattern_id(getTrack(music), music->tracker.frame, channel);
-		if(patternId && music->server.pattern_diff[patternId - PATTERN_START])
+		if(patternId && collab_isChanged(music->collab, 0, patternId - PATTERN_START))
 			music->tic->api.rect_border(music->tic, rect.x, rect.y, rect.w, rect.h, (tic_color_yellow));
 	}
 }
@@ -1540,10 +1515,12 @@ static void drawTracker(Music* music, s32 x, s32 y)
 
 	enum{ChannelWidth = TIC_FONT_WIDTH * 9};
 
+	tic_track* serverTrack = (tic_track*)collab_data(music->collab, music->tic, 1, music->track);
+
 	for (s32 i = 0; i < TIC_SOUND_CHANNELS; i++)
 	{
 		s32 patternId = tic_tool_get_pattern_id(getTrack(music), music->tracker.frame, i);
-		s32 serverPatternId = tic_tool_get_pattern_id(&music->server.music.tracks.data[music->track], music->tracker.frame, i);
+		s32 serverPatternId = tic_tool_get_pattern_id(serverTrack, music->tracker.frame, i);
 		
 		u8 color = patternId != serverPatternId ? (tic_color_yellow) : (tic_color_white);
 
@@ -1816,15 +1793,16 @@ static void onStudioEvent(Music* music, StudioEvent event)
 	}
 }
 
-void initMusic(Music* music, tic_mem* tic, tic_music* src)
+void initMusic(Music* music, tic_mem* tic, s32 bank)
 {
 	if (music->history) history_delete(music->history);
+	if (music->collab) collab_delete(music->collab);
 
 	*music = (Music)
 	{
 		.tic = tic,
 		.tick = tick,
-		.src = src,
+		.src = &tic->cart.banks[bank].music,
 		.track = 0,
 		.tracker =
 		{
@@ -1852,7 +1830,11 @@ void initMusic(Music* music, tic_mem* tic, tic_music* src)
 		},
 
 		.tab = MUSIC_TRACKER_TAB,
-		.history = history_create(src, sizeof(tic_music)),
+		.history = history_create(&tic->cart.banks[bank].music, sizeof(tic_music)),
+		.collab = collab_create(
+			tic_tool_cart_offset(&tic->cart, tic->cart.banks[bank].music.patterns.data), sizeof(tic_track_pattern), MUSIC_PATTERNS,
+			tic_tool_cart_offset(&tic->cart, tic->cart.banks[bank].music.tracks.data), sizeof(tic_track), MUSIC_TRACKS,
+			0, 0, 0),
 		.event = onStudioEvent,
 		.pull = onPull,
 	};

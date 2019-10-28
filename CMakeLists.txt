@@ -622,6 +622,7 @@ set(TIC80LIB_SRC
 	${TIC80LIB_DIR}/map.c
 	${TIC80LIB_DIR}/sfx.c
 	${TIC80LIB_DIR}/music.c
+	${TIC80LIB_DIR}/collab.c
 	${TIC80LIB_DIR}/history.c
 	${TIC80LIB_DIR}/world.c
 	${TIC80LIB_DIR}/config.c

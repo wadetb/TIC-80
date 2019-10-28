@@ -31,6 +31,7 @@
 #include "sfx.h"
 #include "music.h"
 #include "history.h"
+#include "collab.h"
 #include "config.h"
 #include "code.h"
 #include "dialog.h"
@@ -701,14 +702,16 @@ bool modeHasChanges(EditorMode mode)
 {
 	switch(mode)
 	{
+	case TIC_CODE_MODE:
+		return collab_anyChanged(impl.editor[impl.bank.index.code].code->collab);
 	case TIC_SPRITE_MODE:
-		return impl.editor[impl.bank.index.sprites].sprite->server.dirty;
+		return collab_anyChanged(impl.editor[impl.bank.index.sprites].sprite->collab);
 	case TIC_MAP_MODE:
-		return impl.editor[impl.bank.index.map].map->server.dirty;
+		return collab_anyChanged(impl.editor[impl.bank.index.map].map->collab);
 	case TIC_SFX_MODE:
-		return impl.editor[impl.bank.index.sfx].sfx->server.dirty;
+		return collab_anyChanged(impl.editor[impl.bank.index.sfx].sfx->collab);
 	case TIC_MUSIC_MODE:
-		return impl.editor[impl.bank.index.music].music->server.dirty;
+		return collab_anyChanged(impl.editor[impl.bank.index.music].music->collab);
 	default:
 		return false;
 	}
@@ -1167,10 +1170,10 @@ static void initModules()
 	for(s32 i = 0; i < TIC_EDITOR_BANKS; i++)
 	{
 		initCode(impl.editor[i].code, impl.studio.tic, &tic->cart.code);
-		initSprite(impl.editor[i].sprite, impl.studio.tic, &tic->cart.banks[i].tiles);
-		initMap(impl.editor[i].map, impl.studio.tic, &tic->cart.banks[i].map);
-		initSfx(impl.editor[i].sfx, impl.studio.tic, &tic->cart.banks[i].sfx);
-		initMusic(impl.editor[i].music, impl.studio.tic, &tic->cart.banks[i].music);
+		initSprite(impl.editor[i].sprite, impl.studio.tic, i);
+		initMap(impl.editor[i].map, impl.studio.tic, i);
+		initSfx(impl.editor[i].sfx, impl.studio.tic, i);
+		initMusic(impl.editor[i].music, impl.studio.tic, i);
 	}
 
 	initWorldMap();
@@ -1250,6 +1253,12 @@ static bool collabStreamCallback(u8* buffer, s32 size, void* data)
 		music->pull(music);
 	}
 
+	//if(strstr(copy, "pattern") != NULL || strstr(copy, "track") != NULL)
+	{
+		Code* code = impl.editor[impl.bank.index.code].code;
+		code->pull(code);
+	}
+
 	free(copy);
 
 	return impl.collab.streamCounter == (s32)(uintptr_t)data;
@@ -1269,10 +1278,28 @@ bool collabEnabled()
 	return impl.collab.url[0] != '\0';
 }
 
-void setCollabUrl(const char* collabUrl)
+void setCollabUrl(const char* collabUrl, bool initPlz)
 {
 	snprintf(impl.collab.url, sizeof(impl.collab.url), "%s", collabUrl);
 
+	if(initPlz)
+	{
+		// Sprite* sprite = impl.editor[impl.bank.index.sprites].sprite;
+		// sprite->push(sprite);
+
+		// Map* map = impl.editor[impl.bank.index.map].map;
+		// map->push(map);
+
+		// Sfx* sfx = impl.editor[impl.bank.index.sfx].sfx;
+		// sfx->push(sfx);
+
+		// Music* music = impl.editor[impl.bank.index.music].music;
+		// music->push(music);
+
+		// Code* code = impl.editor[impl.bank.index.code].code;
+		// code->push(code);
+	}
+	
 	startCollabStream();
 }
 

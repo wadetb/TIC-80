@@ -26,12 +26,17 @@
 
 typedef struct Sprite Sprite;
 
+typedef struct History History;
+typedef struct Collab Collab;
+
 struct Sprite
 {
 	tic_mem* tic;
 
 	tic_tiles* src;
 
+	s32 bank;
+	
 	u32 tickCounter;
 
 	u16 index;
@@ -60,16 +65,7 @@ struct Sprite
 	}mode;
 
 	struct History* history;
-
-	struct
-	{
-		bool dirty;
-		u8 diff[TIC_SPRITES];
-		tic_tiles tiles;
-		tic_tiles sprites;
-		tic_flags flags;
-		tic_palette palette;
-	}server;
+	struct Collab* collab;
 	
 	void (*tick)(Sprite*);
 	void (*event)(Sprite*, StudioEvent);
@@ -78,4 +74,4 @@ struct Sprite
 	void (*overline)(tic_mem* tic, void* data);
 };
 
-void initSprite(Sprite*, tic_mem*, tic_tiles* src);
+void initSprite(Sprite*, tic_mem*, s32 bank);

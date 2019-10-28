@@ -21,6 +21,7 @@
 // SOFTWARE.
 
 #include "code.h"
+#include "collab.h"
 #include "history.h"
 
 #include <ctype.h>
@@ -604,10 +605,48 @@ static void copyFromClipboard(Code* code)
 
 static void pushToServer(Code* code)
 {
+	if(!collabEnabled())
+		return;
+
+	if(code->tic->api.key(code->tic, tic_key_shift))
+	{
+		collab_put(code->collab, code->tic);
+	}
+	else
+	{
+		// pushSpriteSelectionToServer(sprite);
+	}
 }
 
 static void pullFromServer(Code* code)
 {
+	if(!collabEnabled())
+		return;
+	
+	if(code->tic->api.key(code->tic, tic_key_shift))
+	{
+		collab_get(code->collab, code->tic);
+	}
+	else
+	{
+		// pullSpriteSelectionFromServer(sprite);
+	}
+
+	history(code);
+
+	parseSyntaxColor(code);
+
+}
+
+static void diff(Code *code)
+{
+	collab_diff(code->collab, code->tic);
+}
+
+static void onPull(Code *code)
+{
+	collab_fetch(code->collab, code->tic);
+	diff(code);
 }
 
 static void update(Code* code)
@@ -906,6 +945,8 @@ static void processKeyboard(Code* code)
 	case TIC_CLIPBOARD_CUT: cutToClipboard(code); break;
 	case TIC_CLIPBOARD_COPY: copyToClipboard(code); break;
 	case TIC_CLIPBOARD_PASTE: copyFromClipboard(code); break;
+	case TIC_TOOLBAR_PUSH: pushToServer(code); break;
+	case TIC_TOOLBAR_PULL: pullFromServer(code); break;
 	default: break;
 	}
 
@@ -1454,6 +1495,8 @@ static void tick(Code* code)
 
 	drawCodeToolbar(code);
 
+	diff(code);
+
 	code->tickCounter++;
 }
 
@@ -1493,6 +1536,8 @@ void initCode(Code* code, tic_mem* tic, tic_code* src)
 	if(code->history) history_delete(code->history);
 	if(code->cursorHistory) history_delete(code->cursorHistory);
 
+	if (code->collab) collab_delete(code->collab);
+
 	*code = (Code)
 	{
 		.tic = tic,
@@ -1505,6 +1550,11 @@ void initCode(Code* code, tic_mem* tic, tic_code* src)
 		.tickCounter = 0,
 		.history = NULL,
 		.cursorHistory = NULL,
+		.collab = collab_create(
+			tic_tool_cart_offset(&tic->cart, tic->cart.code.data), sizeof(tic_code), 1,
+			0, 0, 0,
+			0, 0, 0
+		),
 		.mode = TEXT_EDIT_MODE,
 		.jump = {.line = -1},
 		.popup =
@@ -1519,6 +1569,7 @@ void initCode(Code* code, tic_mem* tic, tic_code* src)
 		},
 		.altFont = getConfig()->theme.code.altFont,
 		.event = onStudioEvent,
+		.pull = onPull,
 		.update = update,
 	};
 

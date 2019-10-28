@@ -70,18 +70,11 @@ struct Music
 	} tab;
 
 	struct History* history;
-	
-	struct
-	{
-		bool dirty;
-		bool pattern_diff[MUSIC_PATTERNS];
-		bool track_diff[MUSIC_TRACKS];
-		tic_music music;
-	} server;
+	struct Collab* collab;
 
 	void(*tick)(Music*);
 	void(*event)(Music*, StudioEvent);
 	void(*pull)(Music*);
 };
 
-void initMusic(Music*, tic_mem*, tic_music* src);
+void initMusic(Music*, tic_mem*, s32 bank);
