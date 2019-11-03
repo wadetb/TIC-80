@@ -1262,7 +1262,7 @@ void startCollabStream()
 	impl.collab.streamCounter++;
 
 	char url[1024];
-	snprintf(url, sizeof(url), "%s/watch", impl.collab.url);
+	snprintf(url, sizeof(url), "%s/?watch=1", impl.collab.url);
 	getSystem()->getUrlStream(url, collabStreamCallback, (void*)(uintptr_t)impl.collab.streamCounter);
 }
 
@@ -1278,7 +1278,7 @@ void setCollabUrl(const char* collabUrl, bool initPlz)
 	if(initPlz)
 	{
 		char url[1024];
-		snprintf(url, sizeof(url), "/data?offset=0&size=%d", sizeof(tic_cartridge));
+		snprintf(url, sizeof(url), "/?offset=0&size=%d", sizeof(tic_cartridge));
 		putCollabData(url, (u8*)&impl.studio.tic->cart, sizeof(tic_cartridge));
 	}
 	

@@ -102,7 +102,7 @@ void collab_fetch(Collab* collab, tic_mem* tic)
     s32 size = collab->size * collab->count;
 
     char url[1024];
-    snprintf(url, sizeof(url), "/data?offset=%d&size=%d", collab->offset, size);
+    snprintf(url, sizeof(url), "/?offset=%d&size=%d", collab->offset, size);
     getCollabData(url, data, size);
 }
 
@@ -112,7 +112,7 @@ void collab_put(Collab* collab, tic_mem* tic)
     s32 size = collab->size * collab->count;
 
     char url[1024];
-    snprintf(url, sizeof(url), "/data?offset=%d&size=%d", collab->offset, size);
+    snprintf(url, sizeof(url), "/?offset=%d&size=%d", collab->offset, size);
     putCollabData(url, data, size);
 }
 
@@ -122,7 +122,7 @@ void collab_get(Collab* collab, tic_mem* tic)
     s32 size = collab->size * collab->count;
 
     char url[1024];
-    snprintf(url, sizeof(url), "/data?offset=%d&size=%d", collab->offset, size);
+    snprintf(url, sizeof(url), "/?offset=%d&size=%d", collab->offset, size);
     getCollabData(url, data, size);
 }
 
@@ -133,7 +133,7 @@ void collab_putRange(Collab* collab, tic_mem* tic, s32 first, s32 count)
     u8* data = (u8*)&tic->cart + offset;
 
     char url[1024];
-    snprintf(url, sizeof(url), "/data?offset=%d&size=%d", offset, size);
+    snprintf(url, sizeof(url), "/?offset=%d&size=%d", offset, size);
     putCollabData(url, data, size);
 }
 
@@ -144,6 +144,6 @@ void collab_getRange(Collab* collab, tic_mem* tic, s32 first, s32 count)
     u8* data = (u8*)&tic->cart + offset;
 
     char url[1024];
-    snprintf(url, sizeof(url), "/data?offset=%d&size=%d", offset, size);
+    snprintf(url, sizeof(url), "/?offset=%d&size=%d", offset, size);
     getCollabData(url, data, size);
 }
