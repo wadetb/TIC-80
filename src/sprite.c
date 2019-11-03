@@ -1565,7 +1565,7 @@ static void pullFromServer(Sprite* sprite)
 	history_add(sprite->history);
 }
 
-static void onPull(Sprite *sprite)
+static void onFetch(Sprite *sprite)
 {
 	collab_fetch(sprite->collab.tiles, sprite->tic);
 	collab_fetch(sprite->collab.flags, sprite->tic);
@@ -1878,7 +1878,7 @@ void initSprite(Sprite* sprite, tic_mem* tic, s32 bank)
 			.palette = collab_create(tic_tool_cart_offset(&tic->cart, tic->cart.banks[bank].palette.data), sizeof(tic_rgb), TIC_PALETTE_SIZE),
 		},
 		.event = onStudioEvent,
-		.pull = onPull,
+		.fetch = onFetch,
 		.overline = overline,
 		.scanline = scanline,
 	};

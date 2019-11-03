@@ -75,7 +75,7 @@ struct Sprite
 	
 	void (*tick)(Sprite*);
 	void (*event)(Sprite*, StudioEvent);
-	void (*pull)(Sprite*);
+	void (*fetch)(Sprite*);
 	void (*scanline)(tic_mem* tic, s32 row, void* data);
 	void (*overline)(tic_mem* tic, void* data);
 };

@@ -25,10 +25,6 @@
 
 #define MAX_COLLAB_BLOCKS 3
 
-typedef struct
-{
-} CollabBlock;
-
 struct Collab
 {
 	s32 offset;

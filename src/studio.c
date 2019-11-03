@@ -1229,41 +1229,30 @@ bool studioCartChanged()
 
 static bool collabStreamCallback(u8* buffer, s32 size, void* data)
 {
-	char* copy = malloc(size + 1);
-	memcpy(copy, buffer, size);
-	copy[size] = '\0';
-
-	//if(strstr(copy, "sprite") != NULL || strstr(copy, "flags") != NULL || strstr(copy, "palette") != NULL)
 	{
 		Sprite* sprite = impl.editor[impl.bank.index.sprites].sprite;
-		sprite->pull(sprite);
+		sprite->fetch(sprite);
 	}
 
-	//if(strstr(copy, "map") != NULL)
 	{
 		Map* map = impl.editor[impl.bank.index.map].map;
-		map->pull(map);
+		map->fetch(map);
 	}
 
-	//if(strstr(copy, "sample") != NULL || strstr(copy, "envelope") != NULL)
 	{
 		Sfx* sfx = impl.editor[impl.bank.index.sfx].sfx;
-		sfx->pull(sfx);
+		sfx->fetch(sfx);
 	}
 
-	//if(strstr(copy, "pattern") != NULL || strstr(copy, "track") != NULL)
 	{
 		Music* music = impl.editor[impl.bank.index.music].music;
-		music->pull(music);
+		music->fetch(music);
 	}
 
-	//if(strstr(copy, "pattern") != NULL || strstr(copy, "track") != NULL)
 	{
 		Code* code = impl.editor[impl.bank.index.code].code;
-		code->pull(code);
+		code->fetch(code);
 	}
-
-	free(copy);
 
 	return impl.collab.streamCounter == (s32)(uintptr_t)data;
 }
@@ -1288,20 +1277,9 @@ void setCollabUrl(const char* collabUrl, bool initPlz)
 
 	if(initPlz)
 	{
-		// Sprite* sprite = impl.editor[impl.bank.index.sprites].sprite;
-		// sprite->push(sprite);
-
-		// Map* map = impl.editor[impl.bank.index.map].map;
-		// map->push(map);
-
-		// Sfx* sfx = impl.editor[impl.bank.index.sfx].sfx;
-		// sfx->push(sfx);
-
-		// Music* music = impl.editor[impl.bank.index.music].music;
-		// music->push(music);
-
-		// Code* code = impl.editor[impl.bank.index.code].code;
-		// code->push(code);
+		char url[1024];
+		snprintf(url, sizeof(url), "/data?offset=0&size=%d", sizeof(tic_cartridge));
+		putCollabData(url, (u8*)&impl.studio.tic->cart, sizeof(tic_cartridge));
 	}
 	
 	startCollabStream();

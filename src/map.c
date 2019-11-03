@@ -1092,7 +1092,7 @@ static void pullFromServer(Map *map)
 	history_add(map->history);
 }
 
-static void onPull(Map *map)
+static void onFetch(Map *map)
 {
 	collab_fetch(map->collab, map->tic);
 	collab_diff(map->collab, map->tic);
@@ -1237,7 +1237,7 @@ void initMap(Map* map, tic_mem* tic, s32 bank)
 		.history = history_create(&tic->cart.banks[bank].map, sizeof(tic_map)),
 		.collab = collab_create(tic_tool_cart_offset(&tic->cart, tic->cart.banks[bank].map.data), sizeof(u8), TIC_MAP_WIDTH * TIC_MAP_HEIGHT),
 		.event = onStudioEvent,
-		.pull = onPull,
+		.fetch = onFetch,
 		.overline = overline,
 		.scanline = scanline,
 	};

@@ -747,7 +747,7 @@ static void pullFromServer(Sfx* sfx)
 }
 
 
-static void onPull(Sfx *sfx)
+static void onFetch(Sfx *sfx)
 {
 	collab_fetch(sfx->collab.waveform, sfx->tic);
 	collab_fetch(sfx->collab.samples, sfx->tic);
@@ -1173,6 +1173,6 @@ void initSfx(Sfx* sfx, tic_mem* tic, s32 bank)
 			.samples = collab_create(tic_tool_cart_offset(&tic->cart, tic->cart.banks[bank].sfx.samples.data), sizeof(tic_sample), SFX_COUNT),
 		},
 		.event = onStudioEvent,
-		.pull = onPull,
+		.fetch = onFetch,
 	};
 }

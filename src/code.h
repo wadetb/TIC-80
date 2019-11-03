@@ -107,7 +107,7 @@ struct Code
 	void(*tick)(Code*);
 	void(*escape)(Code*);
 	void(*event)(Code*, StudioEvent);
-	void(*pull)(Code*);
+	void(*fetch)(Code*);
 	void(*update)(Code*);
 };
 

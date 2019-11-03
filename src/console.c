@@ -1533,11 +1533,15 @@ static void onConsoleCollabCommand(Console* console, const char* param)
 		char *buffer = (char*)getSystem()->getUrlRequest(param, &size);
 		if(buffer && size)
 		{
-			setCollabUrl(param, buffer[0] == 'I');
-			
-			char welcome[1024];
-			snprintf(welcome, sizeof(welcome), "\n%.*s", size, buffer + 1);
-			printFront(console, welcome);
+			if(buffer[0] == TIC_COLLAB_PROTOCOL_VERSION)
+			{
+				setCollabUrl(param, buffer[1] != 0);
+				
+				char welcome[1024];
+				snprintf(welcome, sizeof(welcome), "\n%.*s", size - 2, buffer + 2);
+				printFront(console, welcome);
+			}
+			else printBack(console, "\nincompatible server");
 		}
 		else printBack(console, "\nfailed to connect");
 		if(buffer)
