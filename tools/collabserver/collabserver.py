@@ -22,6 +22,7 @@
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 # SOFTWARE.
 #
+import argparse
 import pathlib
 import re
 import struct
@@ -33,19 +34,21 @@ import socketserver
 
 from urllib.parse import urlparse, parse_qs
 
-PORT = 8000
+DEFAULT_PORT = 8000
+DEFAULT_DATA_DIRECTORY = '.'
+DEFAULT_GREETING = 'welcome to collab :)'
+
 PROTOCOL_VERSION = 1
 
 TIC80_SIZE = 1 * 1024 * 1024
 
-DATA_PATH = 'data'
 DATA_EXT = '.tic_collab'
 
 
 class TIC:
-    def __init__(self, name):
-        self.path = (pathlib.Path(DATA_PATH) / name).with_suffix(DATA_EXT)
-        
+    def __init__(self, data_path, name):
+        self.path = (data_path / name).with_suffix(DATA_EXT)
+
         if not self.path.exists():
             with self.path.open('wb') as file:
                 file.write(b'\0' * TIC80_SIZE)
@@ -90,7 +93,7 @@ class CollabRequestHandler(http.server.BaseHTTPRequestHandler):
             raise ValueError
 
         if not name in self.server.tics:
-            self.server.tics[name] = TIC(name)
+            self.server.tics[name] = TIC(server.data_path, name)
 
         return self.server.tics[name]
 
@@ -156,14 +159,15 @@ class CollabRequestHandler(http.server.BaseHTTPRequestHandler):
 
 
 class CollabServer(socketserver.ThreadingMixIn, http.server.HTTPServer):
-    def __init__(self, addr):
-        super().__init__(addr, CollabRequestHandler)
-        self.greeting = 'welcome to collab :)'
-        
+    def __init__(self, address, port, data_dir, greeting):
+        super().__init__((address, port), CollabRequestHandler)
+
         self.tics = {}
 
-        self.data_path = pathlib.Path(DATA_PATH)
+        self.data_path = pathlib.Path(data_dir)
         self.data_path.mkdir(exist_ok=True)
+
+        self.greeting = greeting
 
     def shutdown(self):
         self.socket.close()
@@ -172,10 +176,32 @@ class CollabServer(socketserver.ThreadingMixIn, http.server.HTTPServer):
 
 
 try:
-    server = CollabServer(('localhost', PORT))
-    print('Started http server')
+    parser = argparse.ArgumentParser(description='TIC-80 collaboration server')
+    parser.add_argument('--address',
+                        type=str,
+                        default='',
+                        help='Listen address [default: all interfaces]')
+    parser.add_argument('--port',
+                        type=int,
+                        default=DEFAULT_PORT,
+                        help='Listen port [default: 8000]')
+    parser.add_argument('--data-dir',
+                        type=str,
+                        default=DEFAULT_DATA_DIRECTORY,
+                        metavar='DIR',
+                        help='Data directory [default: current directory]')
+    parser.add_argument('--greeting',
+                        type=str,
+                        default=DEFAULT_GREETING,
+                        help='Alternate server greeting')
+    args = parser.parse_args()
+
+    server = CollabServer(args.address, args.port, args.data_dir,
+                          args.greeting)
+    print('Started collab server on port {}:{} with data in "{}"'.format(
+        args.address, args.port, args.data_dir))
     server.serve_forever()
 
 except KeyboardInterrupt:
-    print('Shutting down server')
+    print('Shutting down collab server')
     server.shutdown()
