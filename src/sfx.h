@@ -70,7 +70,7 @@ struct Sfx
 
 	void(*tick)(Sfx*);
 	void(*event)(Sfx*, StudioEvent);
-	void(*fetch)(Sfx*);
+	void(*diff)(Sfx*);
 };
 
 void initSfx(Sfx*, tic_mem*, s32 bank);

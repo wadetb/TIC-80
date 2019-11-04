@@ -643,9 +643,8 @@ static void diff(Code *code)
 	collab_diff(code->collab, code->tic);
 }
 
-static void onFetch(Code *code)
+static void onDiff(Code *code)
 {
-	collab_fetch(code->collab, code->tic);
 	diff(code);
 }
 
@@ -1565,7 +1564,7 @@ void initCode(Code* code, tic_mem* tic, tic_code* src)
 		},
 		.altFont = getConfig()->theme.code.altFont,
 		.event = onStudioEvent,
-		.fetch = onFetch,
+		.diff = onDiff,
 		.update = update,
 	};
 

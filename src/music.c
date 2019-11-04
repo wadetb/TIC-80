@@ -744,10 +744,8 @@ static void diff(Music *music)
 	}
 }
 
-static void onFetch(Music *music)
+static void onDiff(Music *music)
 {
-	collab_fetch(music->collab.patterns, music->tic);
-	collab_fetch(music->collab.tracks, music->tic);
 	diff(music);
 }
 
@@ -1842,7 +1840,7 @@ void initMusic(Music* music, tic_mem* tic, s32 bank)
 			.tracks = collab_create(tic_tool_cart_offset(&tic->cart, tic->cart.banks[bank].music.tracks.data), sizeof(tic_track), MUSIC_TRACKS),
 		},
 		.event = onStudioEvent,
-		.fetch = onFetch,
+		.diff = onDiff,
 	};
 
 	resetSelection(music);

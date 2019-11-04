@@ -80,7 +80,7 @@ struct Music
 
 	void(*tick)(Music*);
 	void(*event)(Music*, StudioEvent);
-	void(*fetch)(Music*);
+	void(*diff)(Music*);
 };
 
 void initMusic(Music*, tic_mem*, s32 bank);

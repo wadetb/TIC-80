@@ -123,6 +123,8 @@ class CollabRequestHandler(http.server.BaseHTTPRequestHandler):
                     self.send_response(200)
                     self.end_headers()
 
+                    self.wfile.write(struct.pack('<ii', 0, TIC80_SIZE))
+
                     for offset, size in tic.watch(self.client_address):
                         if offset is None:
                             break
