@@ -638,14 +638,9 @@ static void pullFromServer(Code* code)
 
 }
 
-static void diff(Code *code)
-{
-	collab_diff(code->collab, code->tic);
-}
-
 static void onDiff(Code *code)
 {
-	diff(code);
+	collab_diff(code->collab, code->tic);
 }
 
 static void update(Code* code)
@@ -1494,7 +1489,7 @@ static void tick(Code* code)
 
 	drawCodeToolbar(code);
 
-	diff(code);
+	onDiff(code);
 
 	code->tickCounter++;
 }

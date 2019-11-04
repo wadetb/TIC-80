@@ -1067,7 +1067,7 @@ static void drawPaletteOvr(Sprite* sprite, s32 x, s32 y)
 		sprite->tic->api.rect_border(sprite->tic, offsetX - 2, offsetY - 2, PALETTE_CELL_SIZE + 3, PALETTE_CELL_SIZE + 3, (tic_color_white));
 	}
 
-	if(collabEnabled())
+	if(collabShowDiffs())
 	{
 		tic_rgb *mine = sprite->tic->cart.bank0.palette.colors;
 		tic_rgb *server = sprite->tic->collab.banks[sprite->bank].palette.colors;
@@ -1152,7 +1152,7 @@ static void drawSheetOvr(Sprite* sprite, s32 x, s32 y)
 		for(s32 i = 0; i < rect.w; i += TIC_SPRITESIZE, index++)
 			sprite->tic->api.sprite(sprite->tic, sprite->src, index, x + i, y + j, NULL, 0);
 
-	if(collabEnabled())
+	if(collabShowDiffs())
 	{
 		for(s32 j = 0, index = (sprite->index - sprite->index % TIC_BANK_SPRITES); j < rect.h; j += TIC_SPRITESIZE)
 		{
@@ -1797,9 +1797,7 @@ static void tick(Sprite* sprite)
 	drawSpriteToolbar(sprite);
 	drawToolbar(sprite->tic, (tic_color_gray), false);
 
-	collab_diff(sprite->collab.tiles, sprite->tic);
-	collab_diff(sprite->collab.flags, sprite->tic);
-	collab_diff(sprite->collab.palette, sprite->tic);
+	onDiff(sprite);
 
 	sprite->tickCounter++;
 }

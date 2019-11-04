@@ -138,10 +138,10 @@ void setStudioEvent(StudioEvent event);
 void showTooltip(const char* text);
 
 bool collabEnabled();
+bool collabShowDiffs();
+void onCollabChanges();
 void setCollabUrl(const char* collabUrl, bool initPlz);
 char* getCollabUrl();
-void getCollabData(const char* path, void *dest, s32 destSize);
-void putCollabData(const char* path, void *data, s32 size);
 
 tic_key* getKeymap();
 

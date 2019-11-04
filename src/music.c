@@ -219,14 +219,14 @@ static void drawSwitch(Music* music, s32 x, s32 y, u8 changed, const char* label
 				set(music, -1, data);
 		}
 
-		u8 color = (changed & SWITCH_PRIOR_VALUE_IS_CHANGED) ? tic_color_yellow : 
+		u8 color = (collabShowDiffs() && (changed & SWITCH_PRIOR_VALUE_IS_CHANGED)) ? tic_color_yellow : 
 		           over ? tic_color_light_blue : tic_color_dark_gray;
 
 		drawBitIcon(rect.x, rect.y + (down ? 1 : 0), LeftArrow, color);
 	}
 
 	{
-		u8 color = (changed & SWITCH_CURRENT_VALUE_IS_CHANGED) ? (tic_color_yellow) : (tic_color_white);
+		u8 color = (collabShowDiffs() && (changed & SWITCH_CURRENT_VALUE_IS_CHANGED)) ? (tic_color_yellow) : (tic_color_white);
 
 		char val[] = "999";
 		sprintf(val, "%02i", value);
@@ -254,7 +254,7 @@ static void drawSwitch(Music* music, s32 x, s32 y, u8 changed, const char* label
 				set(music, +1, data);
 		}
 
-		u8 color = (changed & SWITCH_LATER_VALUE_IS_CHANGED) ? tic_color_yellow : 
+		u8 color = (collabShowDiffs() && (changed & SWITCH_LATER_VALUE_IS_CHANGED)) ? tic_color_yellow : 
 		           over ? tic_color_light_blue : tic_color_dark_gray;
 
 		drawBitIcon(rect.x, rect.y + (down ? 1 : 0), RightArrow, color);
@@ -723,7 +723,7 @@ static void pullFromServer(Music* music)
 	history_add(music->history);
 }
 
-static void diff(Music *music)
+static void onDiff(Music *music)
 {
 	collab_diff(music->collab.patterns, music->tic);
 	collab_diff(music->collab.tracks, music->tic);
@@ -742,11 +742,6 @@ static void diff(Music *music)
 			}
 		}
 	}
-}
-
-static void onDiff(Music *music)
-{
-	diff(music);
 }
 
 static void setChannelPatternValue(Music* music, s32 patternId, s32 channel)
@@ -1210,7 +1205,7 @@ static void drawTopPanel(Music* music, s32 x, s32 y)
 
 	{
 		u8 changed = 0;
-		if(collabEnabled())
+		if(collabShowDiffs())
 		{
 			if(collab_isChanged(music->collab.tracks, music->track))
 				changed |= SWITCH_CURRENT_VALUE_IS_CHANGED;
@@ -1228,17 +1223,20 @@ static void drawTopPanel(Music* music, s32 x, s32 y)
 	}
 
 	{
-		u8 changed = track->tempo == server->tempo ? 0 : SWITCH_CURRENT_VALUE_IS_CHANGED;
+		u8 changed = collabShowDiffs() && (track->tempo != server->tempo) ? 
+		             SWITCH_CURRENT_VALUE_IS_CHANGED : 0;
 		drawSwitch(music, x += TIC_FONT_WIDTH * 10, y, changed, "TEMPO", track->tempo + DEFAULT_TEMPO, setTempo, NULL);
 	}
 
 	{
-		u8 changed = track->speed == server->speed ? 0 : SWITCH_CURRENT_VALUE_IS_CHANGED;
+		u8 changed = collabShowDiffs() && (track->speed != server->speed) ?
+		             SWITCH_CURRENT_VALUE_IS_CHANGED : 0;
 		drawSwitch(music, x += TIC_FONT_WIDTH * 11, y, changed, "SPD", track->speed + DEFAULT_SPEED, setSpeed, NULL);
 	}
 
 	{
-		u8 changed = track->rows == server->rows ? 0 : SWITCH_CURRENT_VALUE_IS_CHANGED;
+		u8 changed = collabShowDiffs() && (track->rows != server->rows) ?
+		             SWITCH_CURRENT_VALUE_IS_CHANGED : 0;
 		drawSwitch(music, x += TIC_FONT_WIDTH * 8, y, changed, "ROWS", MUSIC_PATTERN_ROWS - track->rows, setRows, NULL);
 	}
 }
@@ -1296,7 +1294,7 @@ static void drawTrackerFrames(Music* music, s32 x, s32 y)
 
 		u8 color = tic_color_dark_gray;
 
-		if(collabEnabled())
+		if(collabShowDiffs())
 		{
 			tic_track* serverTrack = (tic_track*)collab_data(music->collab.tracks, music->tic, music->track);
 			for(s32 channel = 0; channel < TIC_SOUND_CHANNELS; channel++)
@@ -1472,7 +1470,7 @@ static void drawTrackerChannel(Music* music, s32 x, s32 y, s32 channel)
 			music->tic->api.pixel(music->tic, x - 4, y + pos*TIC_FONT_HEIGHT + 2, (tic_color_black));
 	}
 
-	if(collabEnabled())
+	if(collabShowDiffs())
 	{
 		s32 patternId = tic_tool_get_pattern_id(getTrack(music), music->tracker.frame, channel);
 		if(patternId && collab_isChanged(music->collab.patterns, patternId - PATTERN_START))
@@ -1777,7 +1775,7 @@ static void tick(Music* music)
 	drawMusicToolbar(music);
 	drawToolbar(music->tic, (tic_color_gray), false);
 
-	diff(music);
+	onDiff(music);
 }
 
 static void onStudioEvent(Music* music, StudioEvent event)

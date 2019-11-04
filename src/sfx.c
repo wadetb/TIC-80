@@ -83,13 +83,15 @@ static void drawSwitch(Sfx* sfx, s32 x, s32 y, u8 changed, const char* label, s3
 				set(sfx, -1);
 		}
 
-		u8 color = (changed & SWITCH_PRIOR_VALUE_IS_CHANGED) ? (tic_color_yellow) : (tic_color_dark_gray);
+		u8 color = (collabShowDiffs() && (changed & SWITCH_PRIOR_VALUE_IS_CHANGED)) ? 
+		           (tic_color_yellow) : (tic_color_dark_gray);
 
 		drawBitIcon(rect.x, rect.y, LeftArrow, color);
 	}
 
 	{
-		u8 color = (changed & SWITCH_CURRENT_VALUE_IS_CHANGED) ? (tic_color_yellow) : (tic_color_white);
+		u8 color = (collabShowDiffs() && (changed & SWITCH_CURRENT_VALUE_IS_CHANGED)) ? 
+		           (tic_color_yellow) : (tic_color_white);
 
 		char val[] = "99";
 		sprintf(val, "%02i", value);
@@ -109,7 +111,8 @@ static void drawSwitch(Sfx* sfx, s32 x, s32 y, u8 changed, const char* label, s3
 				set(sfx, +1);
 		}
 
-		u8 color = (changed & SWITCH_LATER_VALUE_IS_CHANGED) ? (tic_color_yellow) : (tic_color_white);
+		u8 color = (collabShowDiffs() && (changed & SWITCH_LATER_VALUE_IS_CHANGED)) ?
+		           (tic_color_yellow) : (tic_color_white);
 
 		drawBitIcon(rect.x, rect.y, RightArrow, color);
 	}
@@ -137,6 +140,7 @@ static void setSpeed(Sfx* sfx, s32 delta)
 static void drawStereoSwitch(Sfx* sfx, s32 x, s32 y)
 {
 	tic_sample* effect = getEffect(sfx);
+	tic_sample* server = (tic_sample*)collab_data(sfx->collab.samples, sfx->tic, sfx->index);
 
 	{
 		tic_rect rect = {x, y, TIC_FONT_WIDTH, TIC_FONT_HEIGHT};
@@ -152,6 +156,9 @@ static void drawStereoSwitch(Sfx* sfx, s32 x, s32 y)
 		}
 
 		sfx->tic->api.text(sfx->tic, "L", x, y, effect->stereo_left ? tic_color_dark_gray : tic_color_white, false);
+
+		if(collabShowDiffs() && (effect->stereo_left != server->stereo_left))
+			sfx->tic->api.rect(sfx->tic, x, y+6, 5, 1, tic_color_yellow);
 	}
 
 	{
@@ -168,6 +175,9 @@ static void drawStereoSwitch(Sfx* sfx, s32 x, s32 y)
 		}
 
 		sfx->tic->api.text(sfx->tic, "R", x, y, effect->stereo_right ? tic_color_dark_gray : tic_color_white, false);
+
+		if(collabShowDiffs() && (effect->stereo_right != server->stereo_right))
+			sfx->tic->api.rect(sfx->tic, x, y+6, 5, 1, tic_color_yellow);
 	}
 }
 
@@ -177,7 +187,7 @@ static void drawTopPanel(Sfx* sfx, s32 x, s32 y)
 
 	{
 		u8 changed = 0;
-		if(collabEnabled())
+		if(collabShowDiffs())
 		{
 			if(collab_isChanged(sfx->collab.samples, sfx->index))
 				changed |= SWITCH_CURRENT_VALUE_IS_CHANGED;
@@ -370,6 +380,25 @@ static void drawCanvasTabs(Sfx* sfx, s32 x, s32 y)
 
 	enum {Height = TIC_FONT_HEIGHT+2};
 
+	tic_sample* effect = getEffect(sfx);
+	tic_sample* server = (tic_sample*)collab_data(sfx->collab.samples, sfx->tic, sfx->index);
+
+	bool changed[4] = {false, false, false, false};
+	if(collabShowDiffs())
+	{
+		for(s32 i = 0; i < SFX_TICKS; i++)
+		{
+			if(effect->data[i].wave != server->data[i].wave)
+				changed[0] = true;
+			if(effect->data[i].volume != server->data[i].volume)
+				changed[1] = true;
+			if(effect->data[i].arpeggio != server->data[i].arpeggio)
+				changed[2] = true;
+			if(effect->data[i].pitch != server->data[i].pitch)
+				changed[3] = true;
+		}
+	}
+
 	for(s32 i = 0, sy = y; i < COUNT_OF(Labels); sy += Height, i++)
 	{
 		s32 size = sfx->tic->api.text(sfx->tic, Labels[i], 0, -TIC_FONT_HEIGHT, (tic_color_black), false);
@@ -387,9 +416,10 @@ static void drawCanvasTabs(Sfx* sfx, s32 x, s32 y)
 		}
 
 		sfx->tic->api.text(sfx->tic, Labels[i], rect.x, rect.y, i == sfx->canvasTab ? (tic_color_white) : (tic_color_dark_gray), false);
-	}
 
-	tic_sample* effect = getEffect(sfx);
+		if(collabShowDiffs() && changed[i])
+			sfx->tic->api.rect(sfx->tic, rect.x + size, rect.y, 1, 5, (tic_color_yellow));
+	}
 
 	switch(sfx->canvasTab)
 	{
@@ -746,7 +776,6 @@ static void pullFromServer(Sfx* sfx)
 	history_add(sfx->history);
 }
 
-
 static void onDiff(Sfx *sfx)
 {
 	collab_diff(sfx->collab.waveform, sfx->tic);
@@ -1008,9 +1037,8 @@ static void drawWaveformBar(Sfx* sfx, s32 x, s32 y)
 		if(sfx->waveform.index == i)
 			sfx->tic->api.rect_border(sfx->tic, rect.x-2, rect.y-2, rect.w+4, rect.h+4, (tic_color_white));
 
-		if(collabEnabled())
-			if(collab_isChanged(sfx->collab.waveform, i))
-				sfx->tic->api.rect_border(sfx->tic, rect.x+1, rect.y+1, rect.w-2, rect.h-2, (tic_color_yellow));
+		if(collabShowDiffs() && collab_isChanged(sfx->collab.waveform, i))
+			sfx->tic->api.rect_border(sfx->tic, rect.x+1, rect.y+1, rect.w-2, rect.h-2, (tic_color_yellow));
 		
 		{
 			tic_waveform* wave = getWaveformById(sfx, i);
@@ -1097,8 +1125,7 @@ static void tick(Sfx* sfx)
 
 	playSound(sfx);
 
-	collab_diff(sfx->collab.waveform, sfx->tic);
-	collab_diff(sfx->collab.samples, sfx->tic);
+	onDiff(sfx);
 }
 
 static void onStudioEnvelopeEvent(Sfx* sfx, StudioEvent event)

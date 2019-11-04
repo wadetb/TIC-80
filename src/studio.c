@@ -151,6 +151,8 @@ static struct
 
 	struct
 	{
+		bool enabled;
+		bool showDiffs;
 		char url[FILENAME_MAX];
 		u32 streamCounter;
 		u32 changed;
@@ -700,6 +702,8 @@ static void drawBankIcon(s32 x, s32 y)
 
 bool modeHasChanges(EditorMode mode)
 {
+	if(!collabEnabled())
+		return false;
 	switch(mode)
 	{
 	case TIC_CODE_MODE:
@@ -1227,23 +1231,23 @@ bool studioCartChanged()
 	return memcmp(hash.data, impl.cart.hash.data, sizeof(CartHash)) != 0;
 }
 
-static bool collabStreamCallback(u8* buffer, s32 size, void* data)
+bool collabEnabled()
 {
-	for(int i = 0; i < size / 8; i++)
-	{
-		s32 changeOffset = ((s32*)buffer)[2 * i + 0];
-		s32 changeSize = ((s32*)buffer)[2 * i + 1];
+	return impl.collab.enabled;
+}
 
-		if(changeOffset > sizeof(tic_cartridge))
-			continue;
-		if(changeOffset + changeSize > sizeof(tic_cartridge))
-			changeSize = sizeof(tic_cartridge) - changeOffset;
-			
-		char url[1024];
-		snprintf(url, sizeof(url), "/?offset=%d&size=%d", changeOffset, changeSize);
-		getCollabData(url, ((u8*)&impl.studio.tic->collab) + changeOffset, changeSize);
-	}
+bool collabShowDiffs()
+{
+	return impl.collab.enabled && impl.collab.showDiffs;
+}
 
+void toggleShowDiffs()
+{
+	impl.collab.showDiffs = !impl.collab.showDiffs;
+}
+
+void onCollabChanges()
+{
 	{
 		Code* code = impl.editor[impl.bank.index.code].code;
 		code->diff(code);
@@ -1268,66 +1272,24 @@ static bool collabStreamCallback(u8* buffer, s32 size, void* data)
 		Music* music = impl.editor[impl.bank.index.music].music;
 		music->diff(music);
 	}
-
-	return impl.collab.streamCounter == (s32)(uintptr_t)data;
-}
-
-void startCollabStream()
-{
-	impl.collab.streamCounter++;
-
-	char url[1024];
-	snprintf(url, sizeof(url), "%s/?watch=1", impl.collab.url);
-	getSystem()->getUrlStream(url, collabStreamCallback, (void*)(uintptr_t)impl.collab.streamCounter);
-}
-
-bool collabEnabled()
-{
-	return impl.collab.url[0] != '\0';
 }
 
 void setCollabUrl(const char* collabUrl, bool initPlz)
 {
+	impl.collab.enabled = true;
+	impl.collab.showDiffs = true;
+
 	snprintf(impl.collab.url, sizeof(impl.collab.url), "%s", collabUrl);
 
 	if(initPlz)
-	{
-		char url[1024];
-		snprintf(url, sizeof(url), "/?offset=0&size=%d", (int)sizeof(tic_cartridge));
-		putCollabData(url, (u8*)&impl.studio.tic->cart, sizeof(tic_cartridge));
-	}
+		collab_putInitialData(impl.studio.tic);
 	
-	startCollabStream();
+	collab_startChangesStream(impl.studio.tic);
 }
 
 char* getCollabUrl()
 {
 	return impl.collab.url;
-}
-
-void getCollabData(const char* path, void *dest, s32 destSize)
-{
-	char url[256];
-	snprintf(url, sizeof(url), "%s%s", impl.collab.url, path);
-
-	s32 size;
-	void *buffer = getSystem()->getUrlRequest(url, &size);
-
-	if(buffer)
-	{
-		if(size == destSize)
-			memcpy(dest, buffer, destSize);
-		
-		free(buffer);
-	}
-}
-
-void putCollabData(const char* path, void *data, s32 size)
-{
-	char url[256];
-	snprintf(url, sizeof(url), "%s%s", impl.collab.url, path);
-
-	getSystem()->putUrlRequest(url, data, size);
 }
 
 tic_key* getKeymap()
@@ -1550,6 +1512,7 @@ static void processShortcuts()
 		else if(keyWasPressedOnce(tic_key_r)) runProject();
 		else if(keyWasPressedOnce(tic_key_return)) runProject();
 		else if(keyWasPressedOnce(tic_key_s)) saveProject();
+		else if(keyWasPressedOnce(tic_key_d)) toggleShowDiffs();
 	}
 	else
 	{

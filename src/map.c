@@ -873,7 +873,7 @@ static void drawMapOvr(Map* map)
 	tic->api.map(tic, map->src, getBankTiles(), map->scroll.x / TIC_SPRITESIZE, map->scroll.y / TIC_SPRITESIZE, 
 		TIC_MAP_SCREEN_WIDTH + 1, TIC_MAP_SCREEN_HEIGHT + 1, -scrollX, -scrollY, -1, 1);
 
-	if(collabEnabled())
+	if(collabShowDiffs())
 	{
 		for(s32 y = 0; y < TIC_MAP_HEIGHT; y += TIC_SPRITESIZE)
 		{
@@ -1159,7 +1159,7 @@ static void tick(Map* map)
 	drawMapToolbar(map, TIC80_WIDTH - 9*TIC_FONT_WIDTH, 1);
 	drawToolbar(map->tic, TIC_COLOR_BG, false);
 
-	collab_diff(map->collab, map->tic);
+	onDiff(map);
 }
 
 static void onStudioEvent(Map* map, StudioEvent event)
