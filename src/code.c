@@ -40,6 +40,15 @@ struct OutlineItem
 #define OUTLINE_SIZE ((TIC80_HEIGHT - TOOLBAR_SIZE*2)/TIC_FONT_HEIGHT)
 #define OUTLINE_ITEMS_SIZE (OUTLINE_SIZE * sizeof(OutlineItem))
 
+#define EDIT_INSERT (0 << 30)
+#define EDIT_DELETE (1 << 30)
+#define EDIT_SAME   (2 << 30)
+#define EDIT_MASK   (3 << 30)
+
+#define STATE_SAME    0
+#define STATE_NEW     1
+#define STATE_CHANGED 2
+
 static void history(Code* code)
 {
 	if(history_add(code->history))
@@ -113,6 +122,20 @@ static void drawCode(Code* code, bool withCursor)
 
 		pointer++;
 		colorPointer++;
+	}
+
+	if(collabShowDiffs())
+	{
+		s32 y = code->rect.y - code->scroll.y * STUDIO_TEXT_HEIGHT;
+		for(s32 line = 0; line < code->collab.lineCount; line++)
+		{
+			if(y >= -TIC_FONT_HEIGHT && y < TIC80_HEIGHT)
+			{
+				if(code->collab.lines[line] != STATE_SAME)
+					code->tic->api.rect(code->tic, TIC80_WIDTH - 1, y - 1, 1, TIC_FONT_HEIGHT, (tic_color_yellow));
+			}
+			y += STUDIO_TEXT_HEIGHT;
+		}
 	}
 
 	if(code->cursor.position == pointer)
@@ -610,11 +633,11 @@ static void pushToServer(Code* code)
 
 	if(code->tic->api.key(code->tic, tic_key_shift))
 	{
-		collab_put(code->collab, code->tic);
+		collab_put(code->collab.collab, code->tic);
 	}
 	else
 	{
-		// pushSpriteSelectionToServer(sprite);
+		// pushCodeSelectionToServer(code);
 	}
 }
 
@@ -625,22 +648,180 @@ static void pullFromServer(Code* code)
 	
 	if(code->tic->api.key(code->tic, tic_key_shift))
 	{
-		collab_get(code->collab, code->tic);
+		collab_get(code->collab.collab, code->tic);
 	}
 	else
 	{
-		// pullSpriteSelectionFromServer(sprite);
+		// pullCodeSelectionFromServer(code);
 	}
 
 	history(code);
 
 	parseSyntaxColor(code);
+}
 
+static void splitLines(char* text, char*** lines, int* lineCount)
+{
+	s32 size = strlen(text) + 1;
+	char* textCopy = (char*)malloc(size);
+	memcpy(textCopy, text, size);
+
+	s32 count = 0;
+	for (char* pos = textCopy; pos != (char*)1; pos = strchr(pos, '\n') + 1)
+		count++;
+
+	char** array = (char**)malloc(count * sizeof(char*));
+	
+	s32 index = 0;
+	for (char* pos = textCopy; pos != (char*)1; pos = strchr(pos, '\n') + 1)
+		array[index++] = pos;
+
+	for (s32 i = 1; i < count; i++)
+		array[i][-1] = '\0';
+
+	*lines = array;
+	*lineCount = count;
+}
+
+void myersDiff(char** a, s32 aCount, char** b, s32 bCount, s32** edits, s32* editCount)
+{
+    s32 n = aCount;
+    s32 m = bCount;
+    s32 max = n + m;
+    s32 w = 2 * max + 1;
+
+    s32** trace = (s32**)malloc((max + 1) * sizeof(s32*));
+
+    s32 *v = (s32*)malloc(w * sizeof(s32));
+    v[1] = 0;
+
+#define V(index_) (v[((index_) + w) % w])
+
+    s32 d;
+    for(d = 0; d <= max; d++)
+    {
+        trace[d] = (s32*)malloc(w * sizeof(s32));
+        memcpy(trace[d], v, w * sizeof(s32));
+
+        for(s32 k = -d; k <= d; k += 2)
+        {
+            s32 x;
+            if(k == -d || (k != d && V(k - 1) < V(k + 1)))
+                x = V(k + 1);
+            else
+                x = V(k - 1) + 1;
+
+            s32 y = x - k;
+            while(x < n && y < m && strcmp(a[x], b[y]) == 0)
+            {
+                x++;
+                y++;
+            }
+
+            V(k) = x;
+
+            if(x >= n && y >= m)
+                goto found;
+        }
+    }
+found:;
+
+    free(v);
+
+    *edits = (s32*)malloc(max * sizeof(s32));
+    s32 e = max;
+
+    s32 x = n;
+    s32 y = m;
+
+    for(; d >= 0; d--)
+    {
+        v = trace[d];
+
+        s32 k = x - y;
+
+        s32 prev_k;
+        if(k == -d || (k != d && V(k - 1) < V(k + 1)))
+            prev_k = k + 1;
+        else
+            prev_k = k - 1;
+
+        s32 prev_x = V(prev_k);
+        s32 prev_y = prev_x - prev_k;
+
+        while(x > prev_x && y > prev_y)
+        {
+            x--;
+            y--;
+            (*edits)[--e] = EDIT_SAME | x;
+        }
+
+        if(d > 0)
+        {
+            if(x == prev_x)
+                (*edits)[--e] = EDIT_INSERT | prev_y;
+            else
+                (*edits)[--e] = EDIT_DELETE | prev_x;
+        }
+
+        x = prev_x;
+        y = prev_y;
+
+        free(v);
+    }
+
+#undef V
+
+    free(trace);
+
+    *editCount = max - e;
+
+    memmove(*edits, *edits + e, *editCount * sizeof(int));
 }
 
 static void onDiff(Code *code)
 {
-	collab_diff(code->collab, code->tic);
+	collab_diff(code->collab.collab, code->tic);
+
+	char** lines;
+	s32 count;
+	splitLines(code->tic->cart.code.data, &lines, &count);
+
+	char** serverLines;
+	s32 serverCount;
+	splitLines(code->tic->collab.code.data, &serverLines, &serverCount);
+
+	s32* edits;
+	s32 editCount;
+    myersDiff(serverLines, serverCount, lines, count, &edits, &editCount);
+
+	free(lines[0]);
+	free(lines);
+	free(serverLines[0]);
+	free(serverLines);
+
+	if(code->collab.lines)
+		free(code->collab.lines);
+	
+	code->collab.lineCount = count > serverCount ? count : serverCount;
+	code->collab.lines = malloc(code->collab.lineCount * sizeof(int));
+
+	s32 line = 0;
+    for(s32 i = 0; i < editCount; i++)
+    {
+		if(line >= code->collab.lineCount) // Safety check
+			break;
+        s32 type = edits[i] & EDIT_MASK;
+        s32 offset = edits[i] & ~EDIT_MASK;
+        if(type == EDIT_INSERT)
+			code->collab.lines[line++] = STATE_NEW;
+        else if(type == EDIT_DELETE)
+			code->collab.lines[line] = STATE_CHANGED;
+        else
+			code->collab.lines[line++] = STATE_SAME;
+    }
+
+	free(edits);
 }
 
 static void update(Code* code)
@@ -1530,7 +1711,7 @@ void initCode(Code* code, tic_mem* tic, tic_code* src)
 	if(code->history) history_delete(code->history);
 	if(code->cursorHistory) history_delete(code->cursorHistory);
 
-	if (code->collab) collab_delete(code->collab);
+	if (code->collab.collab) collab_delete(code->collab.collab);
 
 	*code = (Code)
 	{
@@ -1544,7 +1725,12 @@ void initCode(Code* code, tic_mem* tic, tic_code* src)
 		.tickCounter = 0,
 		.history = NULL,
 		.cursorHistory = NULL,
-		.collab = collab_create(tic_tool_cart_offset(&tic->cart, tic->cart.code.data), sizeof(tic_code), 1),
+		.collab = 
+		{
+			.collab = collab_create(tic_tool_cart_offset(&tic->cart, tic->cart.code.data), sizeof(tic_code), 1),
+			.lines = NULL,
+			.lineCount = 0,
+		},
 		.mode = TEXT_EDIT_MODE,
 		.jump = {.line = -1},
 		.popup =

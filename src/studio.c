@@ -707,7 +707,7 @@ bool modeHasChanges(EditorMode mode)
 	switch(mode)
 	{
 	case TIC_CODE_MODE:
-		return collab_anyChanged(impl.editor[impl.bank.index.code].code->collab);
+		return collab_anyChanged(impl.editor[impl.bank.index.code].code->collab.collab);
 	case TIC_SPRITE_MODE:
 		return collab_anyChanged(impl.editor[impl.bank.index.sprites].sprite->collab.tiles) ||
 		       collab_anyChanged(impl.editor[impl.bank.index.sprites].sprite->collab.flags) ||

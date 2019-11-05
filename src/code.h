@@ -71,7 +71,12 @@ struct Code
 	struct History* history;
 	struct History* cursorHistory;
 
-	Collab *collab;
+	struct
+	{
+		Collab* collab;
+		s32* lines;
+		s32 lineCount;
+	} collab;
 
 	enum
 	{
