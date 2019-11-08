@@ -626,6 +626,69 @@ static void copyFromClipboard(Code* code)
 	}
 }
 
+typedef struct
+{
+	char* text;
+	s32* offsets;
+	s32 count;
+} Lines;
+
+static Lines splitLines(char* text)
+{
+	Lines lines = {.text = text, .offsets = NULL, .count = 0};
+
+	for (char* pos = text; pos != (char*)1; pos = strchr(pos, '\n') + 1)
+		lines.count++;
+
+	lines.offsets = (s32*)malloc((lines.count + 1) * sizeof(s32));
+	
+	s32 index = 0;
+	for (char* pos = lines.text; pos != (char*)1; pos = strchr(pos, '\n') + 1)
+		lines.offsets[index++] = pos - text;
+	lines.offsets[index] = lines.offsets[index - 1] + strlen(text + lines.offsets[index - 1]);
+
+	return lines;
+}
+
+static s32 offsetToLine(s32 offset, Lines *lines)
+{
+	s32 l = 0;
+	s32 r = lines->count;
+	while(l < r)
+	{
+		s32 m = (l + r) / 2;
+		if(offset >= lines->offsets[m + 1])
+			l = m + 1;
+		else
+			r = m;
+	}
+	return l;
+}
+
+static char* replaceLines(Lines* to, Lines* from, s32 start, s32 end)
+{
+	s32 toStart = MIN(start, to->count - 1);
+	s32 toEnd = MIN(end, to->count - 1);
+
+	s32 fromStart = MIN(start, from->count - 1);
+	s32 fromEnd = MIN(end, from->count - 1);
+
+	char* prefix = to->text;
+	s32 prefixLen = to->offsets[toStart];
+
+	char* mid = from->text + from->offsets[fromStart];
+	s32 midLen = from->offsets[fromEnd + 1] - from->offsets[fromStart];
+
+	char* suffix = to->text + to->offsets[toEnd + 1];
+	s32 suffixLen = to->offsets[to->count] - to->offsets[toEnd + 1];
+
+	s32 newSize = prefixLen + midLen + suffixLen + 1;
+	char* newSrc = (char*)malloc(newSize);
+	snprintf(newSrc, newSize, "%.*s%.*s%.*s", prefixLen, prefix, midLen, mid, suffixLen, suffix);
+
+	return newSrc;
+}
+
 static void pushToServer(Code* code)
 {
 	if(!collabEnabled())
@@ -637,7 +700,32 @@ static void pushToServer(Code* code)
 	}
 	else
 	{
-		// pushCodeSelectionToServer(code);
+		s32 position = code->cursor.position - code->src;
+		s32 selection = code->cursor.selection ? (code->cursor.selection - code->src) : position;
+
+		Lines lines = splitLines(code->tic->cart.code.data);
+		Lines serverLines = splitLines(code->tic->collab.code.data);
+
+		s32 positionLine = offsetToLine(position, &lines);
+		s32 selectionLine = offsetToLine(selection, &lines);
+
+		s32 startLine = MIN(positionLine, selectionLine);
+		s32 endLine = MAX(positionLine, selectionLine);
+
+		char* backupSrc = (char*)malloc(TIC_CODE_SIZE);
+		memcpy(backupSrc, code->tic->cart.code.data, TIC_CODE_SIZE);
+
+		char* newSrc = replaceLines(&serverLines, &lines, startLine, endLine);
+		snprintf(code->tic->cart.code.data, TIC_CODE_SIZE, "%s", newSrc);
+		free(newSrc);
+
+		collab_put(code->collab.collab, code->tic);
+
+		memcpy(code->tic->cart.code.data, backupSrc, TIC_CODE_SIZE);
+		free(backupSrc);
+
+		free(lines.offsets);
+		free(serverLines.offsets);
 	}
 }
 
@@ -652,7 +740,27 @@ static void pullFromServer(Code* code)
 	}
 	else
 	{
-		// pullCodeSelectionFromServer(code);
+		s32 position = code->cursor.position - code->src;
+		s32 selection = code->cursor.selection ? (code->cursor.selection - code->src) : position;
+
+		Lines lines = splitLines(code->tic->cart.code.data);
+		Lines serverLines = splitLines(code->tic->collab.code.data);
+
+		s32 positionLine = offsetToLine(position, &lines);
+		s32 selectionLine = offsetToLine(selection, &lines);
+
+		s32 startLine = MIN(positionLine, selectionLine);
+		s32 endLine = MAX(positionLine, selectionLine);
+
+		char* newSrc = replaceLines(&lines, &serverLines, startLine, endLine);
+		snprintf(code->src, TIC_CODE_SIZE, "%s", newSrc);
+		free(newSrc);
+
+		code->cursor.position = code->src + lines.offsets[startLine];
+		code->cursor.selection = NULL;
+
+		free(lines.offsets);
+		free(serverLines.offsets);
 	}
 
 	history(code);
@@ -660,33 +768,24 @@ static void pullFromServer(Code* code)
 	parseSyntaxColor(code);
 }
 
-static void splitLines(char* text, char*** lines, int* lineCount)
+bool linesEqual(Lines *a, s32 aLine, Lines *b, s32 bLine)
 {
-	s32 size = strlen(text) + 1;
-	char* textCopy = (char*)malloc(size);
-	memcpy(textCopy, text, size);
+	s32 aOffset = a->offsets[aLine];
+	s32 aLength = a->offsets[aLine + 1] - aOffset;
 
-	s32 count = 0;
-	for (char* pos = textCopy; pos != (char*)1; pos = strchr(pos, '\n') + 1)
-		count++;
+	s32 bOffset = b->offsets[bLine];
+	s32 bLength = b->offsets[bLine + 1] - bOffset;
 
-	char** array = (char**)malloc(count * sizeof(char*));
-	
-	s32 index = 0;
-	for (char* pos = textCopy; pos != (char*)1; pos = strchr(pos, '\n') + 1)
-		array[index++] = pos;
+	if(aLength != bLength)
+		return false;
 
-	for (s32 i = 1; i < count; i++)
-		array[i][-1] = '\0';
-
-	*lines = array;
-	*lineCount = count;
+	return strncmp(a->text + aOffset, b->text + bOffset, aLength) == 0;
 }
 
-void myersDiff(char** a, s32 aCount, char** b, s32 bCount, s32** edits, s32* editCount)
+void myersDiff(Lines *a, Lines *b, s32** edits, s32* editCount)
 {
-    s32 n = aCount;
-    s32 m = bCount;
+    s32 n = a->count;
+    s32 m = b->count;
     s32 max = n + m;
     s32 w = 2 * max + 1;
 
@@ -712,7 +811,7 @@ void myersDiff(char** a, s32 aCount, char** b, s32 bCount, s32** edits, s32* edi
                 x = V(k - 1) + 1;
 
             s32 y = x - k;
-            while(x < n && y < m && strcmp(a[x], b[y]) == 0)
+            while(x < n && y < m && linesEqual(a, x, b, y))
             {
                 x++;
                 y++;
@@ -783,28 +882,21 @@ static void onDiff(Code *code)
 {
 	collab_diff(code->collab.collab, code->tic);
 
-	char** lines;
-	s32 count;
-	splitLines(code->tic->cart.code.data, &lines, &count);
-
-	char** serverLines;
-	s32 serverCount;
-	splitLines(code->tic->collab.code.data, &serverLines, &serverCount);
+	Lines lines = splitLines(code->tic->cart.code.data);
+	Lines serverLines = splitLines(code->tic->collab.code.data);
 
 	s32* edits;
 	s32 editCount;
-    myersDiff(serverLines, serverCount, lines, count, &edits, &editCount);
+    myersDiff(&serverLines, &lines, &edits, &editCount);
 
-	free(lines[0]);
-	free(lines);
-	free(serverLines[0]);
-	free(serverLines);
+	free(lines.offsets);
+	free(serverLines.offsets);
 
 	if(code->collab.lines)
 		free(code->collab.lines);
 	
-	code->collab.lineCount = count > serverCount ? count : serverCount;
-	code->collab.lines = malloc(code->collab.lineCount * sizeof(int));
+	code->collab.lineCount = MAX(lines.count, serverLines.count);
+	code->collab.lines = malloc(code->collab.lineCount * sizeof(s32));
 
 	s32 line = 0;
     for(s32 i = 0; i < editCount; i++)
@@ -1727,7 +1819,7 @@ void initCode(Code* code, tic_mem* tic, tic_code* src)
 		.cursorHistory = NULL,
 		.collab = 
 		{
-			.collab = collab_create(tic_tool_cart_offset(&tic->cart, tic->cart.code.data), sizeof(tic_code), 1),
+			.collab = collab_create(tic_tool_cart_offset(&tic->cart, tic->cart.code.data), 1, sizeof(tic_code)),
 			.lines = NULL,
 			.lineCount = 0,
 		},
