@@ -887,7 +887,7 @@ static void onDiff(Code *code)
 
 	s32* edits;
 	s32 editCount;
-    myersDiff(&serverLines, &lines, &edits, &editCount);
+	myersDiff(&serverLines, &lines, &edits, &editCount);
 
 	free(lines.offsets);
 	free(serverLines.offsets);

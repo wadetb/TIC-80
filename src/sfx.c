@@ -207,7 +207,7 @@ static void drawTopPanel(Sfx* sfx, s32 x, s32 y)
 	{
 		tic_sample* effect = getEffect(sfx);
 		tic_sample* server = (tic_sample*)collab_data(sfx->collab.samples, sfx->tic, sfx->index);
-		u8 changed = effect->speed == server->speed ? 0 : SWITCH_CURRENT_VALUE_IS_CHANGED;
+		u8 changed = (collabShowDiffs() && effect->speed != server->speed) ? SWITCH_CURRENT_VALUE_IS_CHANGED : 0;
 		drawSwitch(sfx, x += Gap, y, changed, "SPD", effect->speed, setSpeed);
 	}
 

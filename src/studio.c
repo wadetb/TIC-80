@@ -341,7 +341,6 @@ static void md5(const void* voidData, s32 length, u8* digest)
 static u8* getSpritePtr(tic_tile* tiles, s32 x, s32 y)
 {
 	enum { SheetCols = (TIC_SPRITESHEET_SIZE / TIC_SPRITESIZE) };
-
 	return tiles[x / TIC_SPRITESIZE + y / TIC_SPRITESIZE * SheetCols].data;
 }
 
