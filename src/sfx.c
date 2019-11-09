@@ -738,9 +738,6 @@ static void copyWaveFromClipboard(Sfx* sfx)
 
 static void pushToServer(Sfx* sfx)
 {
-	if(!collabEnabled())
-		return;
-
 	if(sfx->tic->api.key(sfx->tic, tic_key_shift))
 	{
 		collab_put(sfx->collab.waveform, sfx->tic);
@@ -757,9 +754,6 @@ static void pushToServer(Sfx* sfx)
 
 static void pullFromServer(Sfx* sfx)
 {
-	if(!collabEnabled())
-		return;
-
 	if(sfx->tic->api.key(sfx->tic, tic_key_shift))
 	{
 		collab_get(sfx->collab.waveform, sfx->tic);
@@ -1135,7 +1129,8 @@ static void tick(Sfx* sfx)
 
 	playSound(sfx);
 
-	onDiff(sfx);
+	if(collabEnabled())
+		onDiff(sfx);
 }
 
 static void onStudioEnvelopeEvent(Sfx* sfx, StudioEvent event)

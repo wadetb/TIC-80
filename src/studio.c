@@ -703,8 +703,6 @@ static void drawBankIcon(s32 x, s32 y)
 
 bool modeHasChanges(EditorMode mode)
 {
-	if(!collabEnabled())
-		return false;
 	switch(mode)
 	{
 	case TIC_CODE_MODE:
@@ -824,7 +822,7 @@ void drawToolbar(tic_mem* tic, u8 color, bool bg)
 			drawBitIcon(i * Size, 1, Icons + i * BITS_IN_BYTE, tic_color_black);
 
 		u8 icon =
-			modeHasChanges(Modes[i]) ? tic_color_yellow :
+			(collabEnabled() && modeHasChanges(Modes[i])) ? tic_color_yellow :
 			(mode == i) ? tic_color_white :
 			over ? tic_color_dark_gray :
 			tic_color_light_blue;
@@ -925,14 +923,17 @@ ClipboardEvent getClipboardEvent()
 
 CollabEvent getCollabEvent()
 {
-	tic_mem* tic = impl.studio.tic;
-
-	bool ctrl = tic->api.key(tic, tic_key_ctrl);
-
-	if(ctrl)
+	if(collabEnabled())
 	{
-		if(keyWasPressed(tic_key_p)) return TIC_COLLAB_PUSH;
-		else if(keyWasPressed(tic_key_l)) return TIC_COLLAB_PULL;
+		tic_mem* tic = impl.studio.tic;
+
+		bool ctrl = tic->api.key(tic, tic_key_ctrl);
+
+		if(ctrl)
+		{
+			if(keyWasPressed(tic_key_p)) return TIC_COLLAB_PUSH;
+			else if(keyWasPressed(tic_key_l)) return TIC_COLLAB_PULL;
+		}
 	}
 
 	return TIC_COLLAB_NONE;

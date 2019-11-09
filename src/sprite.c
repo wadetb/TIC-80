@@ -1525,9 +1525,6 @@ static void copyFromClipboard(Sprite* sprite)
 
 static void pushToServer(Sprite* sprite)
 {
-	if(!collabEnabled())
-		return;
-
 	if(sprite->tic->api.key(sprite->tic, tic_key_shift))
 	{
 		collab_put(sprite->collab.tiles, sprite->tic);
@@ -1548,9 +1545,6 @@ static void pushToServer(Sprite* sprite)
 
 static void pullFromServer(Sprite* sprite)
 {
-	if(!collabEnabled())
-		return;
-
 	if(sprite->tic->api.key(sprite->tic, tic_key_shift))
 	{
 		collab_get(sprite->collab.tiles, sprite->tic);
@@ -1808,7 +1802,8 @@ static void tick(Sprite* sprite)
 	drawSpriteToolbar(sprite);
 	drawToolbar(sprite->tic, (tic_color_gray), false);
 
-	onDiff(sprite);
+	if(collabEnabled())
+		onDiff(sprite);
 
 	sprite->tickCounter++;
 }

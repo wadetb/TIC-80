@@ -697,9 +697,6 @@ static char* replaceLines(Lines* to, Lines* from, s32 start, s32 end)
 
 static void pushToServer(Code* code)
 {
-	if(!collabEnabled())
-		return;
-
 	if(code->tic->api.key(code->tic, tic_key_shift))
 	{
 		collab_put(code->collab.collab, code->tic);
@@ -737,9 +734,6 @@ static void pushToServer(Code* code)
 
 static void pullFromServer(Code* code)
 {
-	if(!collabEnabled())
-		return;
-	
 	if(code->tic->api.key(code->tic, tic_key_shift))
 	{
 		collab_get(code->collab.collab, code->tic);
@@ -886,40 +880,43 @@ found:;
 
 static void diff(Code *code)
 {
-	collab_diff(code->collab.collab, code->tic);
-
-	Lines lines = splitLines(code->tic->cart.code.data);
-	Lines serverLines = splitLines(code->tic->collab.code.data);
-
-	s32* edits;
-	s32 editCount;
-	myersDiff(&serverLines, &lines, &edits, &editCount);
-
-	free(lines.offsets);
-	free(serverLines.offsets);
-
-	if(code->collab.lines)
-		free(code->collab.lines);
-	
-	code->collab.lineCount = MAX(lines.count, serverLines.count);
-	code->collab.lines = malloc(code->collab.lineCount * sizeof(s32));
-
-	s32 line = 0;
-	for(s32 i = 0; i < editCount; i++)
+	if(collabEnabled())
 	{
-		if(line >= code->collab.lineCount) // Safety check
-			break;
-		s32 type = edits[i] & EDIT_MASK;
-		s32 offset = edits[i] & ~EDIT_MASK;
-		if(type == EDIT_INSERT)
-			code->collab.lines[line++] = STATE_NEW;
-		else if(type == EDIT_DELETE)
-			code->collab.lines[line] = STATE_CHANGED;
-		else
-			code->collab.lines[line++] = STATE_SAME;
-	}
+		collab_diff(code->collab.collab, code->tic);
 
-	free(edits);
+		Lines lines = splitLines(code->tic->cart.code.data);
+		Lines serverLines = splitLines(code->tic->collab.code.data);
+
+		s32* edits;
+		s32 editCount;
+		myersDiff(&serverLines, &lines, &edits, &editCount);
+
+		free(lines.offsets);
+		free(serverLines.offsets);
+
+		if(code->collab.lines)
+			free(code->collab.lines);
+		
+		code->collab.lineCount = MAX(lines.count, serverLines.count);
+		code->collab.lines = malloc(code->collab.lineCount * sizeof(s32));
+
+		s32 line = 0;
+		for(s32 i = 0; i < editCount; i++)
+		{
+			if(line >= code->collab.lineCount) // Safety check
+				break;
+			s32 type = edits[i] & EDIT_MASK;
+			s32 offset = edits[i] & ~EDIT_MASK;
+			if(type == EDIT_INSERT)
+				code->collab.lines[line++] = STATE_NEW;
+			else if(type == EDIT_DELETE)
+				code->collab.lines[line] = STATE_CHANGED;
+			else
+				code->collab.lines[line++] = STATE_SAME;
+		}
+
+		free(edits);
+	}
 }
 
 static void update(Code* code)

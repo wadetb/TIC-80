@@ -1054,9 +1054,6 @@ static void clampSelectionRect(tic_rect* rect)
 
 static void pushToServer(Map *map)
 {
-	if(!collabEnabled())
-		return;
-
 	if(map->tic->api.key(map->tic, tic_key_shift))
 	{
 		collab_put(map->collab, map->tic);
@@ -1074,9 +1071,6 @@ static void pushToServer(Map *map)
 
 static void pullFromServer(Map *map)
 {
-	if(!collabEnabled())
-		return;
-
 	if(map->tic->api.key(map->tic, tic_key_shift))
 	{
 		collab_get(map->collab, map->tic);
@@ -1166,7 +1160,8 @@ static void tick(Map* map)
 	drawMapToolbar(map, TIC80_WIDTH - 9*TIC_FONT_WIDTH, 1);
 	drawToolbar(map->tic, TIC_COLOR_BG, false);
 
-	onDiff(map);
+	if(collabEnabled())
+		onDiff(map);
 }
 
 static void onStudioEvent(Map* map, StudioEvent event)

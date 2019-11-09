@@ -671,9 +671,6 @@ static void copyFromClipboard(Music* music)
 
 static void pushToServer(Music* music)
 {
-	if(!collabEnabled())
-		return;
-
 	if(music->tic->api.key(music->tic, tic_key_shift))
 	{
 		collab_put(music->collab.patterns, music->tic);
@@ -697,9 +694,6 @@ static void pushToServer(Music* music)
 
 static void pullFromServer(Music* music)
 {
-	if(!collabEnabled())
-		return;
-
 	if(music->tic->api.key(music->tic, tic_key_shift))
 	{
 		collab_get(music->collab.patterns, music->tic);
@@ -1780,7 +1774,8 @@ static void tick(Music* music)
 	drawMusicToolbar(music);
 	drawToolbar(music->tic, (tic_color_gray), false);
 
-	onDiff(music);
+	if(collabEnabled())
+		onDiff(music);
 }
 
 static void onStudioEvent(Music* music, StudioEvent event)
