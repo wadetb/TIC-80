@@ -121,14 +121,20 @@ class CollabRequestHandler(http.server.BaseHTTPRequestHandler):
 
                 elif 'watch' in query:
                     self.send_response(200)
+                    self.send_header('Transfer-Encoding', 'chunked')
                     self.end_headers()
 
-                    self.wfile.write(struct.pack('<ii', 0, TIC80_SIZE))
+                    prefix = '8\r\n'.encode()
+                    suffix = '\r\n'.encode()
+                    self.wfile.write(prefix + struct.pack('<ii', 0, TIC80_SIZE) + suffix)
 
                     for offset, size in tic.watch(self.client_address):
                         if offset is None:
                             break
-                        self.wfile.write(struct.pack('<ii', offset, size))
+                        self.wfile.write(prefix + struct.pack('<ii', offset, size) + suffix)
+                        print('write {} bytes\n', size)
+
+                    self.wfile.write('0\r\n\r\n'.encode())
 
                 elif 'offset' in query:
                     offset = int(query['offset'][0])

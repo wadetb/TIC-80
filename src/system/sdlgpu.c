@@ -1197,62 +1197,19 @@ typedef struct
 	char path[1024];
 } URLParts;
 
-static bool splitUrl(const char *url, URLParts *parts)
-{
-	strcpy(parts->host, "");
-	parts->port = 80;
-	strcpy(parts->path, "");
-
-	const char *urlStart = url;
-	if(strncmp(url, "http://", 7) == 0)
-		urlStart += 7;
-	else if (strstr(url, "://"))
-		return false;
-
-	char urlCopy[1024];
-	snprintf(urlCopy, sizeof(urlCopy), "%s", urlStart);
-
-	char* path = strchr(urlCopy, '/');
-	if(path)
-	{
-		snprintf(parts->path, sizeof(parts->path), "%s", path);
-		*path = '\0';
-	}
-
-	char* port = strchr(urlCopy, ':');
-	if(port)
-	{
-		parts->port = strtoul(port + 1, NULL, 10);
-		*port = '\0';
-	}
-
-	snprintf(parts->host, sizeof(parts->host), "%s", urlCopy);
-
-	return true;
-}
-
 static void* getUrlRequest(const char* url, s32* size)
 {
-	URLParts parts;
-	if (!splitUrl(url, &parts))
-		return NULL;
-	return netGetRequest(platform.net, parts.host, parts.port, parts.path, size);
+	return netGetRequest(platform.net, url, size);
 }
 
 static void putUrlRequest(const char* url, void *data, s32 size)
 {
-	URLParts parts;
-	if (!splitUrl(url, &parts))
-		return;
-	netPutRequest(platform.net, parts.host, parts.port, parts.path, data, size);
+	netPutRequest(platform.net, url, data, size);
 }
 
 static void getUrlStream(const char* url, url_stream_callback callback, void *data)
 {
-	URLParts parts;
-	if (!splitUrl(url, &parts))
-		return;
-	netGetStream(platform.net, parts.host, parts.port, parts.path, callback, data);
+	netGetStream(platform.net, url, callback, data);
 }
 
 static void preseed()

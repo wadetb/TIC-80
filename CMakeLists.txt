@@ -631,8 +631,9 @@ foreach(TIC80_OUTPUT ${TIC80_OUTPUTS})
 	target_include_directories(${TIC80_OUTPUT}lib PRIVATE ${CMAKE_SOURCE_DIR}/include)
 	target_include_directories(${TIC80_OUTPUT}lib PRIVATE ${THIRDPARTY_DIR}/lua-5.3.1/src)
 	target_include_directories(${TIC80_OUTPUT}lib PRIVATE ${THIRDPARTY_DIR}/curl/include)
+	target_include_directories(${TIC80_OUTPUT}lib PRIVATE ${THIRDPARTY_DIR}/sdl2/include)
 
-	target_link_libraries(${TIC80_OUTPUT}lib tic80core zlib libcurl)
+	target_link_libraries(${TIC80_OUTPUT}lib tic80core zlib libcurl SDL2-static)
 
 endforeach()
 

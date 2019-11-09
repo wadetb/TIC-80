@@ -28,6 +28,10 @@ struct
     tic_mem *tic;
 
     s32 streamCounter;
+
+	u8* stream;
+	s32 streamPos;
+	s32 streamSize;
 } impl;
 
 struct Collab
@@ -167,30 +171,46 @@ void collab_putInitialData(tic_mem *tic)
 	getSystem()->putUrlRequest(url, &tic->cart, sizeof(tic_cartridge));
 }
 
-static void collab_getChanges(tic_mem *tic, u8* buffer, s32 size)
+typedef struct
 {
-	for(s32 i = 0; i < size / (2 * sizeof(s32)); i++)
-	{
-		s32 changeOffset = ((s32*)buffer)[2 * i + 0];
-		s32 changeSize = ((s32*)buffer)[2 * i + 1];
-
-		if(changeOffset > sizeof(tic_cartridge))
-			continue;
-		if(changeOffset + changeSize > sizeof(tic_cartridge))
-			changeSize = sizeof(tic_cartridge) - changeOffset;
-
-		char url[1024];
-		snprintf(url, sizeof(url), "/?offset=%d&size=%d", changeOffset, changeSize);
-		getCollabData(url, (u8*)&tic->collab + changeOffset, changeSize);
-	}
-}
+	s32 offset;
+	s32 size;
+} StreamChunk;
 
 static bool collab_streamCallback(u8* buffer, s32 size, void* data)
 {
 	if(impl.streamCounter != (s32)(uintptr_t)data)
 		return false;
 
-	collab_getChanges(impl.tic, buffer, size);
+	printf("stream callback %d\n", size);
+
+	if(impl.streamPos + size > impl.streamSize)
+	{
+		impl.streamSize = impl.streamPos + size;
+		impl.stream = realloc(impl.stream, impl.streamSize);
+	}
+
+	memcpy(impl.stream + impl.streamPos, buffer, size);
+	impl.streamPos += size;
+
+	while(impl.streamPos >= sizeof(StreamChunk))
+	{
+		StreamChunk* chunk = (StreamChunk*)impl.stream;
+
+		if(chunk->offset > sizeof(tic_cartridge))
+			continue;
+		if(chunk->offset + chunk->size > sizeof(tic_cartridge))
+			chunk->size = sizeof(tic_cartridge) - chunk->offset;
+
+		printf("got chunk %d %d\n", chunk->offset, chunk->size);
+
+		char url[1024];
+		snprintf(url, sizeof(url), "/?offset=%d&size=%d", chunk->offset, chunk->size);
+		getCollabData(url, (u8*)&impl.tic->collab + chunk->offset, chunk->size);
+
+		memmove(impl.stream, impl.stream + sizeof(StreamChunk), impl.streamPos - sizeof(StreamChunk));
+		impl.streamPos -= sizeof(StreamChunk);
+	}
 
     onCollabChanges();
 
