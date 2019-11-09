@@ -1110,11 +1110,16 @@ static void processKeyboard(Map* map)
 	case TIC_CLIPBOARD_CUT: cutToClipboard(map); break;
 	case TIC_CLIPBOARD_COPY: copyToClipboard(map); break;
 	case TIC_CLIPBOARD_PASTE: copyFromClipboard(map); break;
-	case TIC_TOOLBAR_PUSH: pushToServer(map); break;
-	case TIC_TOOLBAR_PULL: pullFromServer(map); break;
 	default: break;
 	}
 	
+	switch(getCollabEvent())
+	{
+	case TIC_COLLAB_PULL: pullFromServer(map); break;
+	case TIC_COLLAB_PUSH: pushToServer(map); break;
+	default: break;
+	}
+
 	if(ctrl)
 	{
 		if(keyWasPressed(tic_key_z)) 		undo(map);

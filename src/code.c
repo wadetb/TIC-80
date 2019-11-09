@@ -1212,8 +1212,13 @@ static void processKeyboard(Code* code)
 	case TIC_CLIPBOARD_CUT: cutToClipboard(code); break;
 	case TIC_CLIPBOARD_COPY: copyToClipboard(code); break;
 	case TIC_CLIPBOARD_PASTE: copyFromClipboard(code); break;
-	case TIC_TOOLBAR_PUSH: pushToServer(code); break;
-	case TIC_TOOLBAR_PULL: pullFromServer(code); break;
+	default: break;
+	}
+
+	switch(getCollabEvent())
+	{
+	case TIC_COLLAB_PULL: pullFromServer(code); break;
+	case TIC_COLLAB_PUSH: pushToServer(code); break;
 	default: break;
 	}
 

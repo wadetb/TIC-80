@@ -912,8 +912,6 @@ ClipboardEvent getClipboardEvent()
 		if(keyWasPressed(tic_key_insert) || keyWasPressed(tic_key_c)) return TIC_CLIPBOARD_COPY;
 		else if(keyWasPressed(tic_key_x)) return TIC_CLIPBOARD_CUT;
 		else if(keyWasPressed(tic_key_v)) return TIC_CLIPBOARD_PASTE;
-		else if(keyWasPressed(tic_key_p)) return TIC_TOOLBAR_PUSH;
-		else if(keyWasPressed(tic_key_l)) return TIC_TOOLBAR_PULL;
 	}
 	else if(shift)
 	{
@@ -922,6 +920,21 @@ ClipboardEvent getClipboardEvent()
 	}
 
 	return TIC_CLIPBOARD_NONE;
+}
+
+CollabEvent getCollabEvent()
+{
+	tic_mem* tic = impl.studio.tic;
+
+	bool ctrl = tic->api.key(tic, tic_key_ctrl);
+
+	if(ctrl)
+	{
+		if(keyWasPressed(tic_key_p)) return TIC_COLLAB_PUSH;
+		else if(keyWasPressed(tic_key_l)) return TIC_COLLAB_PULL;
+	}
+
+	return TIC_COLLAB_NONE;
 }
 
 static void showPopupMessage(const char* text)

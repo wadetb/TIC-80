@@ -841,8 +841,13 @@ static void processEnvelopesKeyboard(Sfx* sfx)
 	case TIC_CLIPBOARD_CUT: cutToClipboard(sfx); break;
 	case TIC_CLIPBOARD_COPY: copyToClipboard(sfx); break;
 	case TIC_CLIPBOARD_PASTE: copyFromClipboard(sfx); break;
-	case TIC_TOOLBAR_PUSH: pushToServer(sfx); break;
-	case TIC_TOOLBAR_PULL: pullFromServer(sfx); break;
+	default: break;
+	}
+
+	switch(getCollabEvent())
+	{
+	case TIC_COLLAB_PULL: pullFromServer(sfx); break;
+	case TIC_COLLAB_PUSH: pushToServer(sfx); break;
 	default: break;
 	}
 
@@ -869,8 +874,13 @@ static void processWaveformKeyboard(Sfx* sfx)
 	case TIC_CLIPBOARD_CUT: cutWaveToClipboard(sfx); break;
 	case TIC_CLIPBOARD_COPY: copyWaveToClipboard(sfx); break;
 	case TIC_CLIPBOARD_PASTE: copyWaveFromClipboard(sfx); break;
-	case TIC_TOOLBAR_PUSH: pushToServer(sfx); break;
-	case TIC_TOOLBAR_PULL: pullFromServer(sfx); break;
+	default: break;
+	}
+
+	switch(getCollabEvent())
+	{
+	case TIC_COLLAB_PULL: pullFromServer(sfx); break;
+	case TIC_COLLAB_PUSH: pushToServer(sfx); break;
 	default: break;
 	}
 

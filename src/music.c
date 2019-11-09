@@ -1103,8 +1103,13 @@ static void processKeyboard(Music* music)
 	case TIC_CLIPBOARD_CUT: copyToClipboard(music, true); break;
 	case TIC_CLIPBOARD_COPY: copyToClipboard(music, false); break;
 	case TIC_CLIPBOARD_PASTE: copyFromClipboard(music); break;
-	case TIC_TOOLBAR_PUSH: pushToServer(music); break;
-	case TIC_TOOLBAR_PULL: pullFromServer(music); break;
+	default: break;
+	}
+
+	switch(getCollabEvent())
+	{
+	case TIC_COLLAB_PULL: pullFromServer(music); break;
+	case TIC_COLLAB_PUSH: pushToServer(music); break;
 	default: break;
 	}
 

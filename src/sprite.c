@@ -1622,8 +1622,13 @@ static void processKeyboard(Sprite* sprite)
 	case TIC_CLIPBOARD_CUT: cutToClipboard(sprite); break;
 	case TIC_CLIPBOARD_COPY: copyToClipboard(sprite); break;
 	case TIC_CLIPBOARD_PASTE: copyFromClipboard(sprite); break;
-	case TIC_TOOLBAR_PUSH: pushToServer(sprite); break;
-	case TIC_TOOLBAR_PULL: pullFromServer(sprite); break;
+	default: break;
+	}
+
+	switch(getCollabEvent())
+	{
+	case TIC_COLLAB_PULL: pullFromServer(sprite); break;
+	case TIC_COLLAB_PUSH: pushToServer(sprite); break;
 	default: break;
 	}
 

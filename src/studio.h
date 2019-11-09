@@ -125,6 +125,15 @@ ClipboardEvent getClipboardEvent();
 
 typedef enum
 {
+	TIC_COLLAB_NONE,
+	TIC_COLLAB_PULL,
+	TIC_COLLAB_PUSH,
+} CollabEvent;
+
+CollabEvent getCollabEvent();
+
+typedef enum
+{
 	TIC_TOOLBAR_CUT,
 	TIC_TOOLBAR_COPY,
 	TIC_TOOLBAR_PASTE,
