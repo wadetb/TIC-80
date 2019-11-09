@@ -49,6 +49,8 @@ struct OutlineItem
 #define STATE_NEW     1
 #define STATE_CHANGED 2
 
+static void diff(Code *code);
+
 static void history(Code* code)
 {
 	if(history_add(code->history))
@@ -465,7 +467,7 @@ static bool replaceSelection(Code* code)
 		code->cursor.selection = NULL;
 
 		history(code);
-
+		diff(code);
 		parseSyntaxColor(code);
 
 		return true;
@@ -481,6 +483,7 @@ static void deleteChar(Code* code)
 		char* pos = code->cursor.position;
 		memmove(pos, pos + 1, strlen(pos));
 		history(code);
+		diff(code);
 		parseSyntaxColor(code);
 	}
 }
@@ -492,6 +495,7 @@ static void backspaceChar(Code* code)
 		char* pos = --code->cursor.position;
 		memmove(pos, pos + 1, strlen(pos));
 		history(code);
+		diff(code);
 		parseSyntaxColor(code);
 	}
 }
@@ -508,6 +512,7 @@ static void inputSymbolBase(Code* code, char sym)
 	*code->cursor.position++ = sym;
 
 	history(code);
+	diff(code);
 
 	updateColumn(code);
 
@@ -581,6 +586,7 @@ static void cutToClipboard(Code* code)
 	copyToClipboard(code);
 	replaceSelection(code);
 	history(code);
+	diff(code);
 }
 
 static void copyFromClipboard(Code* code)
@@ -617,7 +623,7 @@ static void copyFromClipboard(Code* code)
 				code->cursor.position += size;
 
 				history(code);
-
+				diff(code);
 				parseSyntaxColor(code);
 			}
 
@@ -764,7 +770,7 @@ static void pullFromServer(Code* code)
 	}
 
 	history(code);
-
+	diff(code);
 	parseSyntaxColor(code);
 }
 
@@ -878,7 +884,7 @@ found:;
     memmove(*edits, *edits + e, *editCount * sizeof(int));
 }
 
-static void onDiff(Code *code)
+static void diff(Code *code)
 {
 	collab_diff(code->collab.collab, code->tic);
 
@@ -919,6 +925,7 @@ static void onDiff(Code *code)
 static void update(Code* code)
 {
 	updateEditor(code);
+	diff(code);
 	parseSyntaxColor(code);
 }
 
@@ -995,6 +1002,7 @@ static void doTab(Code* code, bool shift, bool crtl)
 			else if (start <= end) code->cursor.position = end;
 			
 			history(code);
+			diff(code);
 			parseSyntaxColor(code);
 		}
 	}
@@ -1197,7 +1205,7 @@ static void commentLine(Code* code)
 	code->cursor.selection = NULL;	
 
 	history(code);
-
+	diff(code);
 	parseSyntaxColor(code);
 }
 
@@ -1767,8 +1775,6 @@ static void tick(Code* code)
 
 	drawCodeToolbar(code);
 
-	onDiff(code);
-
 	code->tickCounter++;
 }
 
@@ -1842,7 +1848,7 @@ void initCode(Code* code, tic_mem* tic, tic_code* src)
 		},
 		.altFont = getConfig()->theme.code.altFont,
 		.event = onStudioEvent,
-		.diff = onDiff,
+		.diff = diff,
 		.update = update,
 	};
 
