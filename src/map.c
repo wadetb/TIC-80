@@ -24,6 +24,8 @@
 #include "collab.h"
 #include "history.h"
 
+#define SHEET_COLS (TIC_SPRITESHEET_SIZE / TIC_SPRITESIZE)
+
 #define MAP_WIDTH (TIC80_WIDTH)
 #define MAP_HEIGHT (TIC80_HEIGHT - TOOLBAR_SIZE)
 #define MAP_X (0)
@@ -308,7 +310,7 @@ static void drawTileIndex(Map* map, s32 x, s32 y)
 			mx /= TIC_SPRITESIZE;
 			my /= TIC_SPRITESIZE;
 
-			index = mx + my * TIC_SPRITESHEET_COLS;
+			index = mx + my * SHEET_COLS;
 		}
 	}
 	else
@@ -442,7 +444,7 @@ static void setMapSprite(Map* map, s32 x, s32 y)
 
 	for(s32 j = 0; j < map->sheet.rect.h; j++)
 		for(s32 i = 0; i < map->sheet.rect.w; i++)
-			map->tic->api.map_set(map->tic, map->src, (x+i)%TIC_MAP_WIDTH, (y+j)%TIC_MAP_HEIGHT, (mx+i) + (my+j) * TIC_SPRITESHEET_COLS);
+			map->tic->api.map_set(map->tic, map->src, (x+i)%TIC_MAP_WIDTH, (y+j)%TIC_MAP_HEIGHT, (mx+i) + (my+j) * SHEET_COLS);
 
 	history_add(map->history);
 }
@@ -475,7 +477,7 @@ static void drawTileCursor(Map* map)
 
 		for(s32 j = 0, ty=my; j < map->sheet.rect.h; j++, ty+=TIC_SPRITESIZE)
 			for(s32 i = 0, tx=mx; i < map->sheet.rect.w; i++, tx+=TIC_SPRITESIZE)
-				map->tic->api.sprite(map->tic, getBankTiles(), (sx+i) + (sy+j) * TIC_SPRITESHEET_COLS, tx, ty, NULL, 0);					
+				map->tic->api.sprite(map->tic, getBankTiles(), (sx+i) + (sy+j) * SHEET_COLS, tx, ty, NULL, 0);					
 	}
 
 	drawCursorPos(map, mx, my);
@@ -519,7 +521,7 @@ static void processMouseDrawMode(Map* map)
 		getMouseMap(map, &tx, &ty);
 		s32 index = map->tic->api.map_get(map->tic, map->src, tx, ty);
 
-		map->sheet.rect = (tic_rect){index % TIC_SPRITESHEET_COLS, index / TIC_SPRITESHEET_COLS, 1, 1};
+		map->sheet.rect = (tic_rect){index % SHEET_COLS, index / SHEET_COLS, 1, 1};
 	}
 }
 
@@ -732,7 +734,7 @@ static bool pop(FillStack* stack, s32* x, s32* y)
 
 static void fillMap(Map* map, s32 x, s32 y, u8 tile)
 {
-	if(tile == (map->sheet.rect.x + map->sheet.rect.y * TIC_SPRITESHEET_COLS)) return;
+	if(tile == (map->sheet.rect.x + map->sheet.rect.y * SHEET_COLS)) return;
 
 	static FillStack stack = {NULL, NULL};
 
@@ -769,7 +771,7 @@ static void fillMap(Map* map, s32 x, s32 y, u8 tile)
 	{
 		for(s32 j = 0; j < map->sheet.rect.h; j++)
 			for(s32 i = 0; i < map->sheet.rect.w; i++)
-				map->tic->api.map_set(map->tic, map->src, x+i, y+j, (mx+i) + (my+j) * TIC_SPRITESHEET_COLS);
+				map->tic->api.map_set(map->tic, map->src, x+i, y+j, (mx+i) + (my+j) * SHEET_COLS);
 
 		for(s32 i = 0; i < COUNT_OF(dx); i++) 
 		{

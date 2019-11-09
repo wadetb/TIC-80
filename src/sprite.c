@@ -1162,29 +1162,31 @@ static void drawSheetOvr(Sprite* sprite, s32 x, s32 y)
 				{
 					bool l = false, r = false, t = false, b = false;
 
+					enum { SheetCols = (TIC_SPRITESHEET_SIZE / TIC_SPRITESIZE) };
+
 					s32 bank_index = index % TIC_BANK_SPRITES;
-					if((bank_index % TIC_SPRITESHEET_COLS) > 0)
+					if((bank_index % SheetCols) > 0)
 					{
 						if(collab_isChanged(sprite->collab.tiles, index - 1) ||
 						   collab_isChanged(sprite->collab.flags, index - 1))
 							l = true;
 					}
-					if((bank_index % TIC_SPRITESHEET_COLS) < TIC_SPRITESHEET_COLS - 1)
+					if((bank_index % SheetCols) < SheetCols - 1)
 					{
 						if(collab_isChanged(sprite->collab.tiles, index + 1) ||
 						   collab_isChanged(sprite->collab.flags, index + 1))
 						    r = true;
 					}
-					if(bank_index >= TIC_SPRITESHEET_COLS)
+					if(bank_index >= SheetCols)
 					{
-						if(collab_isChanged(sprite->collab.tiles, index - TIC_SPRITESHEET_COLS) ||
-						   collab_isChanged(sprite->collab.flags, index - TIC_SPRITESHEET_COLS))
+						if(collab_isChanged(sprite->collab.tiles, index - SheetCols) ||
+						   collab_isChanged(sprite->collab.flags, index - SheetCols))
 						    t = true;
 					}
-					if(bank_index < TIC_BANK_SPRITES - TIC_SPRITESHEET_COLS)
+					if(bank_index < TIC_BANK_SPRITES - SheetCols)
 					{
-						if(collab_isChanged(sprite->collab.tiles, index + TIC_SPRITESHEET_COLS) ||
-						   collab_isChanged(sprite->collab.flags, index + TIC_SPRITESHEET_COLS))
+						if(collab_isChanged(sprite->collab.tiles, index + SheetCols) ||
+						   collab_isChanged(sprite->collab.flags, index + SheetCols))
 						    b = true;
 					}
 
@@ -1536,8 +1538,10 @@ static void pushToServer(Sprite* sprite)
 	{
 		for(s32 y = 0, i = 0; y < sprite->size / TIC_SPRITESIZE; y++)
 		{
-			collab_putRange(sprite->collab.tiles, sprite->tic, sprite->index + y * TIC_SPRITESHEET_COLS, sprite->size / TIC_SPRITESIZE);
-			collab_putRange(sprite->collab.flags, sprite->tic, sprite->index + y * TIC_SPRITESHEET_COLS, sprite->size / TIC_SPRITESIZE);
+			enum { SheetCols = (TIC_SPRITESHEET_SIZE / TIC_SPRITESIZE) };
+
+			collab_putRange(sprite->collab.tiles, sprite->tic, sprite->index + y * SheetCols, sprite->size / TIC_SPRITESIZE);
+			collab_putRange(sprite->collab.flags, sprite->tic, sprite->index + y * SheetCols, sprite->size / TIC_SPRITESIZE);
 		}
 	}
 }
@@ -1557,8 +1561,10 @@ static void pullFromServer(Sprite* sprite)
 	{
 		for(s32 y = 0, i = 0; y < sprite->size / TIC_SPRITESIZE; y++)
 		{
-			collab_getRange(sprite->collab.tiles, sprite->tic, sprite->index + y * TIC_SPRITESHEET_COLS, sprite->size / TIC_SPRITESIZE);
-			collab_getRange(sprite->collab.flags, sprite->tic, sprite->index + y * TIC_SPRITESHEET_COLS, sprite->size / TIC_SPRITESIZE);
+			enum { SheetCols = (TIC_SPRITESHEET_SIZE / TIC_SPRITESIZE) };
+
+			collab_getRange(sprite->collab.tiles, sprite->tic, sprite->index + y * SheetCols, sprite->size / TIC_SPRITESIZE);
+			collab_getRange(sprite->collab.flags, sprite->tic, sprite->index + y * SheetCols, sprite->size / TIC_SPRITESIZE);
 		}
 	}
 

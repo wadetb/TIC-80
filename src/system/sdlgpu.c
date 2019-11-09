@@ -142,7 +142,8 @@ static void initSound()
 
 static const u8* getSpritePtr(const tic_tile* tiles, s32 x, s32 y)
 {
-	return tiles[x / TIC_SPRITESIZE + y / TIC_SPRITESIZE * TIC_SPRITESHEET_COLS].data;
+	enum { SheetCols = (TIC_SPRITESHEET_SIZE / TIC_SPRITESIZE) };
+	return tiles[x / TIC_SPRITESIZE + y / TIC_SPRITESIZE * SheetCols].data;
 }
 
 static u8 getSpritePixel(const tic_tile* tiles, s32 x, s32 y)

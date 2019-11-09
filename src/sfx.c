@@ -246,12 +246,12 @@ static void drawLoopPanel(Sfx* sfx, s32 x, s32 y)
 	tic_sound_loop* serverLoop = server->loops + sfx->canvasTab;
 
 	{
-		u8 changed = loop->size == serverLoop->size ? 0 : SWITCH_CURRENT_VALUE_IS_CHANGED;
+		u8 changed = (collabShowDiffs() && loop->size != serverLoop->size) ? SWITCH_CURRENT_VALUE_IS_CHANGED : 0;
 		drawSwitch(sfx, x, y += Gap + TIC_FONT_HEIGHT, changed, "", loop->size, setLoopSize);
 	}
 
 	{
-		u8 changed = loop->start == serverLoop->start ? 0 : SWITCH_CURRENT_VALUE_IS_CHANGED;
+		u8 changed = (collabShowDiffs() && loop->start != serverLoop->start) ? SWITCH_CURRENT_VALUE_IS_CHANGED : 0;
 		drawSwitch(sfx, x, y += Gap + TIC_FONT_HEIGHT, changed, "", loop->start, setLoopStart);
 	}
 }

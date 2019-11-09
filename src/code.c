@@ -899,19 +899,19 @@ static void onDiff(Code *code)
 	code->collab.lines = malloc(code->collab.lineCount * sizeof(s32));
 
 	s32 line = 0;
-    for(s32 i = 0; i < editCount; i++)
-    {
+	for(s32 i = 0; i < editCount; i++)
+	{
 		if(line >= code->collab.lineCount) // Safety check
 			break;
-        s32 type = edits[i] & EDIT_MASK;
-        s32 offset = edits[i] & ~EDIT_MASK;
-        if(type == EDIT_INSERT)
+		s32 type = edits[i] & EDIT_MASK;
+		s32 offset = edits[i] & ~EDIT_MASK;
+		if(type == EDIT_INSERT)
 			code->collab.lines[line++] = STATE_NEW;
-        else if(type == EDIT_DELETE)
+		else if(type == EDIT_DELETE)
 			code->collab.lines[line] = STATE_CHANGED;
-        else
+		else
 			code->collab.lines[line++] = STATE_SAME;
-    }
+	}
 
 	free(edits);
 }

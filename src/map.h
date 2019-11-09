@@ -82,7 +82,7 @@ struct Map
 
 	struct History* history;
 	struct Collab* collab;
-	
+
 	void (*tick)(Map*);
 	void (*event)(Map*, StudioEvent);
 	void (*diff)(Map*);
