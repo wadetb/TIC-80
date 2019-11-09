@@ -701,7 +701,7 @@ static void pullFromServer(Music* music)
 	}
 	else
 	{
-		collab_putRange(music->collab.tracks, music->tic, music->track, 1);
+		collab_getRange(music->collab.tracks, music->tic, music->track, 1);
 
 		for (s32 frame = 0; frame < MUSIC_FRAMES; frame++)
 		{

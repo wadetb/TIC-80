@@ -151,6 +151,7 @@ bool collabShowDiffs();
 void onCollabChanges();
 void setCollabUrl(const char* collabUrl, bool initPlz);
 char* getCollabUrl();
+void disableCollab();
 
 tic_key* getKeymap();
 

@@ -1307,6 +1307,13 @@ char* getCollabUrl()
 	return impl.collab.url;
 }
 
+void disableCollab()
+{
+	impl.collab.enabled = false;
+
+	collab_stopChangesStream();
+}
+
 tic_key* getKeymap()
 {
 	return impl.keycodes;

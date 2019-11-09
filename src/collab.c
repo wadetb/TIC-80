@@ -187,11 +187,14 @@ static void collab_getChanges(tic_mem *tic, u8* buffer, s32 size)
 
 static bool collab_streamCallback(u8* buffer, s32 size, void* data)
 {
+	if(impl.streamCounter != (s32)(uintptr_t)data)
+		return false;
+
 	collab_getChanges(impl.tic, buffer, size);
 
     onCollabChanges();
 
-	return impl.streamCounter == (s32)(uintptr_t)data;
+	return true;
 }
 
 void collab_startChangesStream(tic_mem *tic)
@@ -202,4 +205,9 @@ void collab_startChangesStream(tic_mem *tic)
 	char url[1024];
 	snprintf(url, sizeof(url), "%s/?watch=1", getCollabUrl());
 	getSystem()->getUrlStream(url, collab_streamCallback, (void*)(uintptr_t)impl.streamCounter);
+}
+
+void collab_stopChangesStream()
+{
+	impl.streamCounter++;
 }

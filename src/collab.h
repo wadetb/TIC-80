@@ -41,3 +41,4 @@ void collab_putRange(Collab* collab, tic_mem* tic, s32 first, s32 count);
 void collab_getRange(Collab* collab, tic_mem* tic, s32 first, s32 count);
 void collab_putInitialData(tic_mem *tic);
 void collab_startChangesStream(tic_mem *tic);
+void collab_stopChangesStream();

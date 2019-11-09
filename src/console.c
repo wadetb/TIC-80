@@ -1529,23 +1529,31 @@ static void onConsoleCollabCommand(Console* console, const char* param)
 {
 	if(param && strlen(param))
 	{
-		s32 size;
-		char *buffer = (char*)getSystem()->getUrlRequest(param, &size);
-		if(buffer && size)
+		if(strcmp(param, "off") == 0)
 		{
-			if(buffer[0] == TIC_COLLAB_PROTOCOL_VERSION)
-			{
-				setCollabUrl(param, buffer[1] != 0);
-				
-				char welcome[1024];
-				snprintf(welcome, sizeof(welcome), "\n%.*s", size - 2, buffer + 2);
-				printFront(console, welcome);
-			}
-			else printBack(console, "\nincompatible server");
+			disableCollab();
+			printBack(console, "\ncollab disabled");
 		}
-		else printBack(console, "\nfailed to connect");
-		if(buffer)
-			free(buffer);
+		else
+		{
+			s32 size;
+			char *buffer = (char*)getSystem()->getUrlRequest(param, &size);
+			if(buffer && size)
+			{
+				if(buffer[0] == TIC_COLLAB_PROTOCOL_VERSION)
+				{
+					setCollabUrl(param, buffer[1] != 0);
+					
+					char welcome[1024];
+					snprintf(welcome, sizeof(welcome), "\n%.*s", size - 2, buffer + 2);
+					printFront(console, welcome);
+				}
+				else printBack(console, "\nincompatible server");
+			}
+			else printBack(console, "\nfailed to connect");
+			if(buffer)
+				free(buffer);
+		}
 	}
 	else printBack(console, "\ninvalid collab server");
 
