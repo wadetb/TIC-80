@@ -374,17 +374,9 @@ static s32 writeGifData(const tic_mem* tic, u8* dst, const u8* src, s32 width, s
 	return size;
 }
 
-static void loadCart(tic_mem* tic, tic_cartridge* cart, const u8* buffer, s32 size, bool palette)
+static bool loadRom(tic_mem* tic, const void* data, s32 size)
 {
-	tic->api.load(cart, buffer, size, palette);
-
-	if(!palette)
-		memcpy(cart->bank0.palette.data, getConfig()->cart->bank0.palette.data, sizeof(tic_palette));
-}
-
-static bool loadRom(tic_mem* tic, const void* data, s32 size, bool palette)
-{
-	loadCart(tic, &tic->cart, data, size, palette);
+	tic->api.load(&tic->cart, data, size);
 	tic->api.reset(tic);
 
 	return true;
@@ -427,8 +419,8 @@ static bool onConsoleLoadSectionCommand(Console* console, const char* param)
 
 					if(cart)
 					{
-						loadCart(console->tic, cart, data, size, true);
 						tic_mem* tic = console->tic;
+                        tic->api.load(cart, data, size);
 
 						switch(i)
 						{
@@ -515,7 +507,7 @@ static void* getDemoCart(Console* console, ScriptLang script, s32* size)
 		{
 			static const u8 LuaDemoRom[] =
 			{
-				#include "../bin/assets/luademo.tic.dat"
+				#include "../build/assets/luademo.tic.dat"
 			};
 
 			demo = LuaDemoRom;
@@ -528,7 +520,7 @@ static void* getDemoCart(Console* console, ScriptLang script, s32* size)
 		{
 			static const u8 MoonDemoRom[] =
 			{
-				#include "../bin/assets/moondemo.tic.dat"
+				#include "../build/assets/moondemo.tic.dat"
 			};
 
 			demo = MoonDemoRom;
@@ -542,7 +534,7 @@ static void* getDemoCart(Console* console, ScriptLang script, s32* size)
 		{
 			static const u8 FennelDemoRom[] =
 			{
-				#include "../bin/assets/fenneldemo.tic.dat"
+				#include "../build/assets/fenneldemo.tic.dat"
 			};
 
 			demo = FennelDemoRom;
@@ -559,7 +551,7 @@ static void* getDemoCart(Console* console, ScriptLang script, s32* size)
 		{
 			static const u8 JsDemoRom[] =
 			{
-				#include "../bin/assets/jsdemo.tic.dat"
+				#include "../build/assets/jsdemo.tic.dat"
 			};
 
 			demo = JsDemoRom;
@@ -573,7 +565,7 @@ static void* getDemoCart(Console* console, ScriptLang script, s32* size)
 		{
 			static const u8 WrenDemoRom[] =
 			{
-				#include "../bin/assets/wrendemo.tic.dat"
+				#include "../build/assets/wrendemo.tic.dat"
 			};
 
 			demo = WrenDemoRom;
@@ -587,7 +579,7 @@ static void* getDemoCart(Console* console, ScriptLang script, s32* size)
 		{
 			static const u8 SquirrelDemoRom[] =
 			{
-				#include "../bin/assets/squirreldemo.tic.dat"
+				#include "../build/assets/squirreldemo.tic.dat"
 			};
 
 			demo = SquirrelDemoRom;
@@ -656,7 +648,7 @@ static void onConsoleLoadDemoCommandConfirmed(Console* console, const char* para
 
 	setCartName(console, name);
 
-	loadRom(console->tic, data, size, true);
+	loadRom(console->tic, data, size);
 
 	studioRomLoaded();
 
@@ -681,32 +673,17 @@ static void onCartLoaded(Console* console, const char* name)
 
 }
 
-static bool hasExt(const char* name, const char* ext)
-{
-	return strcmp(name + strlen(name) - strlen(ext), ext) == 0;
-}
-
 #if defined(TIC80_PRO)
-
-static bool hasProjectExt(const char* name)
-{
-	return hasExt(name, PROJECT_LUA_EXT)
-		|| hasExt(name, PROJECT_MOON_EXT)
-		|| hasExt(name, PROJECT_JS_EXT)
-		|| hasExt(name, PROJECT_WREN_EXT)
-		|| hasExt(name, PROJECT_SQUIRREL_EXT)
-		|| hasExt(name, PROJECT_FENNEL_EXT);
-}
 
 static const char* projectComment(const char* name)
 {
 	char* comment;
 
-	if(hasExt(name, PROJECT_JS_EXT) 
-		|| hasExt(name, PROJECT_WREN_EXT)
-		|| hasExt(name, PROJECT_SQUIRREL_EXT))
+	if(tic_tool_has_ext(name, PROJECT_JS_EXT) 
+		|| tic_tool_has_ext(name, PROJECT_WREN_EXT)
+		|| tic_tool_has_ext(name, PROJECT_SQUIRREL_EXT))
 		comment = "//";
-	else if(hasExt(name, PROJECT_FENNEL_EXT))
+	else if(tic_tool_has_ext(name, PROJECT_FENNEL_EXT))
 		comment = ";;";
 	else
 		comment = "--";
@@ -982,6 +959,8 @@ static bool loadProject(Console* console, const char* name, const char* data, s3
 		if(cart)
 		{
 			memset(cart, 0, sizeof(tic_cartridge));
+
+			// TODO: should we use DB16 default palette here?
             memcpy(&cart->bank0.palette, &getConfig()->cart->bank0.palette.data, sizeof(tic_palette));
 
 			const char* comment = projectComment(name);
@@ -1066,7 +1045,7 @@ static void onConsoleLoadCommandConfirmed(Console* console, const char* param)
 		{
 			console->showGameMenu = fsIsInPublicDir(console->fs);
 
-			loadRom(console->tic, data, size, true);
+			loadRom(console->tic, data, size);
 
 			onCartLoaded(console, name);
 
@@ -1128,7 +1107,7 @@ static void load(Console* console, const char* path, const char* hash)
 		{
 			console->showGameMenu = true;
 
-			loadRom(console->tic, data, size, true);
+			loadRom(console->tic, data, size);
 			onCartLoaded(console, name);
 
 			free(data);		
@@ -1224,8 +1203,7 @@ static void loadDemo(Console* console, ScriptLang script)
 
 	if(data)
 	{
-		loadRom(console->tic, data, size, false);
-
+		loadRom(console->tic, data, size);
 		free(data);
 	}
 
@@ -1448,47 +1426,47 @@ static void onConsoleInstallDemosCommand(Console* console, const char* param)
 {
 	static const u8 DemoFire[] =
 	{
-		#include "../bin/assets/fire.tic.dat"
+		#include "../build/assets/fire.tic.dat"
 	};
 
 	static const u8 DemoP3D[] =
 	{
-		#include "../bin/assets/p3d.tic.dat"
+		#include "../build/assets/p3d.tic.dat"
 	};
 
 	static const u8 DemoSFX[] =
 	{
-		#include "../bin/assets/sfx.tic.dat"
+		#include "../build/assets/sfx.tic.dat"
 	};
 
 	static const u8 DemoPalette[] =
 	{
-		#include "../bin/assets/palette.tic.dat"
+		#include "../build/assets/palette.tic.dat"
 	};
 
 	static const u8 DemoFont[] =
 	{
-		#include "../bin/assets/font.tic.dat"
+		#include "../build/assets/font.tic.dat"
 	};
 
 	static const u8 DemoMusic[] =
 	{
-		#include "../bin/assets/music.tic.dat"
+		#include "../build/assets/music.tic.dat"
 	};
 
 	static const u8 GameQuest[] =
 	{
-		#include "../bin/assets/quest.tic.dat"
+		#include "../build/assets/quest.tic.dat"
 	};
 
 	static const u8 GameTetris[] =
 	{
-		#include "../bin/assets/tetris.tic.dat"
+		#include "../build/assets/tetris.tic.dat"
 	};
 
 	static const u8 Benchmark[] =
 	{
-		#include "../bin/assets/benchmark.tic.dat"
+		#include "../build/assets/benchmark.tic.dat"
 	};
 
 	FileSystem* fs = console->fs;
@@ -2381,6 +2359,7 @@ static void onConsoleRamCommand(Console* console, const char* param)
 		{offsetof(tic_ram, music.patterns.data), 		"MUSIC PATTERNS"},
 		{offsetof(tic_ram, music.tracks.data), 			"MUSIC TRACKS"},
 		{offsetof(tic_ram, sound_state), 				"SOUND STATE"},
+		{offsetof(tic_ram, persistent),					"PERSISTENT MEMORY"},
 		{offsetof(tic_ram, flags), 						"SPRITE FLAGS"},
 		{offsetof(tic_ram, free), 						"..."},
 		{TIC_RAM_SIZE, 									""},
@@ -2731,15 +2710,19 @@ static lua_State* netLuaInit(u8* buffer, s32 size)
 {
 	if (buffer && size)
 	{
+		char* script = calloc(1, size + 1);
+		memcpy(script, buffer, size);
 		lua_State* lua = luaL_newstate();
 
 		if(lua)
 		{
-			if(luaL_loadstring(lua, (char*)buffer) == LUA_OK && lua_pcall(lua, 0, LUA_MULTRET, 0) == LUA_OK)
+			if(luaL_loadstring(lua, (char*)script) == LUA_OK && lua_pcall(lua, 0, LUA_MULTRET, 0) == LUA_OK)
 				return lua;
 
 			else lua_close(lua);
 		}
+
+		free(script);
 	}
 
 	return NULL;
@@ -2760,6 +2743,7 @@ static NetVersion netVersionRequest()
 	if(buffer && size)
 	{
 		lua_State* lua = netLuaInit(buffer, size);
+		free(buffer);
 
 		if(lua)
 		{
@@ -2954,9 +2938,10 @@ static bool cmdLoadCart(Console* console, const char* name)
 		else
 #endif
 
-		if(hasExt(name, CART_EXT))
+		if(tic_tool_has_ext(name, CART_EXT))
 		{
-			loadCart(console->tic, console->embed.file, data, size, true);	
+            tic_mem* tic = console->tic;
+            tic->api.load(console->embed.file, data, size);
 
 			char cartName[FILENAME_MAX];
 			fsFilename(name, cartName);
@@ -3205,6 +3190,7 @@ void initConsole(Console* console, tic_mem* tic, FileSystem* fs, Config* config,
 
 	if(argc > 1)
 	{
+		// TODO: should we use default DB16 palette here???
 		memcpy(console->embed.file->bank0.palette.data, getConfig()->cart->bank0.palette.data, sizeof(tic_palette));
 
 		u32 argp = 1;
@@ -3304,7 +3290,7 @@ void initConsole(Console* console, tic_mem* tic, FileSystem* fs, Config* config,
 
 			u8* data = NULL;
 			s32 size = unzip(&data, cartPtr, cartSize);
-			loadCart(tic, console->embed.file, data, size, true);
+            tic->api.load(console->embed.file, data, size);
 
 			free(data);
 
@@ -3338,7 +3324,7 @@ void initConsole(Console* console, tic_mem* tic, FileSystem* fs, Config* config,
 
 						if(data)
 						{
-							loadCart(tic, console->embed.file, data, dataSize, true);
+                            tic->api.load(console->embed.file, data, dataSize);
 							console->embed.yes = true;
 							
 							free(data);

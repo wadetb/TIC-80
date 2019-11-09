@@ -48,8 +48,8 @@
 #define TIC_NAME "TIC-80"
 #define TIC_NAME_FULL TIC_NAME " tiny computer"
 #define TIC_TITLE TIC_NAME_FULL " " TIC_VERSION_LABEL
-#define TIC_HOST "tic.computer"
-#define TIC_COPYRIGHT "http://" TIC_HOST " (C) 2017"
+#define TIC_HOST "tic80.com"
+#define TIC_COPYRIGHT "https://" TIC_HOST " (C) 2019"
 
 #define TIC_COLLAB_PROTOCOL_VERSION 1
 
@@ -454,19 +454,24 @@ typedef union
 {
 	struct
 	{
-		tic_vram vram;
-		tic_tiles tiles;
-		tic_tiles sprites;
-		tic_map map;
-		tic80_input input;
-		u8 unknown[12];
-		tic_stereo_volume stereo;
-		tic_sound_register registers[TIC_SOUND_CHANNELS];
-		tic_sfx sfx;
-		tic_music music;
-		tic_sound_state sound_state;
-		tic_flags flags;
-		u8 free[16*1024 - sizeof(tic_flags)];
+		tic_vram 			vram;
+		tic_tiles 			tiles;
+		tic_tiles 			sprites;
+		tic_map 			map;
+		tic80_input 		input;
+		u8 					unknown[12];
+		tic_stereo_volume 	stereo;
+		tic_sound_register 	registers[TIC_SOUND_CHANNELS];
+		tic_sfx 			sfx;
+		tic_music 			music;
+		tic_sound_state 	sound_state;
+		tic_persistent		persistent;
+		tic_flags 			flags;
+
+		u8 free[16*1024 
+			- sizeof(tic_flags) 
+			- sizeof(tic_persistent) 
+			];
 	};
 
 	u8 data[TIC_RAM_SIZE];

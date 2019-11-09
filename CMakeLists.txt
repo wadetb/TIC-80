@@ -3,16 +3,16 @@ cmake_minimum_required(VERSION 3.3)
 project(TIC-80 C CXX)
 message("Building for target : ${CMAKE_SYSTEM_NAME}")
 
-
-
 if(ANDROID OR EMSCRIPTEN)
 	set(BUILD_SOKOL_DEFAULT OFF)
 	set(BUILD_LIBRETRO_DEFAULT OFF)
 	set(BUILD_DEMO_CARTS_DEFAULT OFF)
+	set(BUILD_PLAYER_DEFAULT OFF)
 else()
 	set(BUILD_SOKOL_DEFAULT ON)
 	set(BUILD_LIBRETRO_DEFAULT ON)
 	set(BUILD_DEMO_CARTS_DEFAULT ON)
+	set(BUILD_PLAYER_DEFAULT ON)
 endif()
 
 option(BUILD_SDL "SDL Enabled" ON)
@@ -20,6 +20,7 @@ option(BUILD_SOKOL "Sokol Enabled" ${BUILD_SOKOL_DEFAULT})
 option(BUILD_LIBRETRO "libretro Enabled" ${BUILD_LIBRETRO_DEFAULT})
 option(BUILD_DEMO_CARTS "Demo Carts Enabled" ${BUILD_DEMO_CARTS_DEFAULT})
 option(BUILD_PRO "Build PRO version" FALSE)
+option(BUILD_PLAYER "Build standalone players" ${BUILD_PLAYER_DEFAULT})
 
 if (BAREMETALPI)
 
@@ -53,9 +54,12 @@ else()
 endif()
 
 # removed squirrel language as it doesn't seem to compile under arm. Needs investigation.
-# note: hardcoded flags are for RPI2. Should try to use the ones
-# generated in CIRCLE during config
-set(CMAKE_C_FLAGS " -DTIC_BUILD_WITH_FENNEL -DTIC_BUILD_WITH_MOON -DTIC_BUILD_WITH_JS -DTIC_BUILD_WITH_WREN -DTIC_BUILD_WITH_LUA -DLUA_32BITS -std=c99 -march=armv7-a+neon-vfpv4  -D AARCH=32 -D __circle__ -D BAREMETALPI  --specs=nosys.specs -O3 -mabi=aapcs -marm  -mfloat-abi=hard -mfpu=neon-vfpv4  -D__DYNAMIC_REENT__")
+# Ideally should use the CFLAGS defined in circle build files, not hardwire them here too.
+# For RPI2
+#set(CMAKE_C_FLAGS " -DTIC_BUILD_WITH_FENNEL -DTIC_BUILD_WITH_MOON -DTIC_BUILD_WITH_JS -DTIC_BUILD_WITH_WREN -DTIC_BUILD_WITH_LUA -DLUA_32BITS -std=c99 -march=armv7-a+neon-vfpv4  -D AARCH=32 -D __circle__ -D BAREMETALPI  --specs=nosys.specs -O3 -mabi=aapcs -marm  -mfloat-abi=hard -mfpu=neon-vfpv4  -D__DYNAMIC_REENT__")
+# For RPI3
+# investigate -funsafe-math-optimizations and -march=armv8-a+crc -mcpu=cortex-a53
+set(CMAKE_C_FLAGS " -DTIC_BUILD_WITH_FENNEL -DTIC_BUILD_WITH_MOON -DTIC_BUILD_WITH_JS -DTIC_BUILD_WITH_WREN -DTIC_BUILD_WITH_LUA -DLUA_32BITS -std=c99 -march=armv8-a  -D AARCH=32 -mtune=cortex-a53  -D __circle__ -D BAREMETALPI  --specs=nosys.specs -O3 -marm -mfloat-abi=hard -mfpu=neon-fp-armv8 -funsafe-math-optimizations -D__DYNAMIC_REENT__")
 
 set(CMAKE_C_COMPILER ${TOOLCHAIN_PREFIX}gcc)
 set(CMAKE_ASM_COMPILER ${CMAKE_C_COMPILER})
@@ -109,10 +113,9 @@ else()
 
 	set(CMAKE_C_STANDARD 99)
 
-
-if(EMSCRIPTEN)
-	set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -s USE_SDL=2")
-endif()
+	if(EMSCRIPTEN)
+		set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -s USE_SDL=2")
+	endif()
 
 endif()
 
@@ -122,7 +125,7 @@ set(THIRDPARTY_DIR ${CMAKE_SOURCE_DIR}/3rd-party)
 # LUA
 ################################
 
-set(LUA_DIR ${THIRDPARTY_DIR}/lua-5.3.1/src)
+set(LUA_DIR ${THIRDPARTY_DIR}/lua)
 set(LUA_SRC 
 	${LUA_DIR}/lapi.c
 	${LUA_DIR}/lcode.c
@@ -146,7 +149,6 @@ set(LUA_SRC
 	${LUA_DIR}/lzio.c
 	${LUA_DIR}/lauxlib.c
 	${LUA_DIR}/lbaselib.c
-	${LUA_DIR}/lbitlib.c
 	${LUA_DIR}/lcorolib.c
 	${LUA_DIR}/ldblib.c
 	${LUA_DIR}/liolib.c
@@ -162,12 +164,13 @@ set(LUA_SRC
 add_library(lua STATIC ${LUA_SRC})
 
 target_compile_definitions(lua PRIVATE LUA_COMPAT_5_2)
+target_include_directories(lua INTERFACE ${THIRDPARTY_DIR}/lua)
 
 ################################
 # LPEG
 ################################
 
-set(LPEG_DIR ${THIRDPARTY_DIR}/lpeg-1.0.1)
+set(LPEG_DIR ${THIRDPARTY_DIR}/lpeg)
 set(LPEG_SRC 
 	${LPEG_DIR}/lpcap.c
 	${LPEG_DIR}/lpcode.c
@@ -239,7 +242,7 @@ target_include_directories(squirrel PRIVATE ${SQUIRREL_DIR}/sqstdlib)
 # GIFLIB
 ################################
 
-set(GIFLIB_DIR ${THIRDPARTY_DIR}/giflib-5.1.4/lib)
+set(GIFLIB_DIR ${THIRDPARTY_DIR}/giflib)
 set(GIFLIB_SRC
 	${GIFLIB_DIR}/dgif_lib.c
 	${GIFLIB_DIR}/egif_lib.c
@@ -250,7 +253,9 @@ set(GIFLIB_SRC
 	${GIFLIB_DIR}/openbsd-reallocarray.c
 )
 add_library(giflib STATIC ${GIFLIB_SRC})
-target_include_directories(giflib PRIVATE ${GIFLIB_DIR})
+target_include_directories(giflib 
+	PRIVATE ${GIFLIB_DIR}
+	INTERFACE ${THIRDPARTY_DIR}/giflib)
 
 ################################
 # TIC-80 core
@@ -264,7 +269,7 @@ set(TIC80CORE_SRC
 	${TIC80CORE_DIR}/jsapi.c 
 	${TIC80CORE_DIR}/luaapi.c 
 	${TIC80CORE_DIR}/wrenapi.c 
-        ${TIC80CORE_DIR}/squirrelapi.c
+	${TIC80CORE_DIR}/squirrelapi.c
 	${TIC80CORE_DIR}/ext/gif.c
 	${THIRDPARTY_DIR}/blip-buf/blip_buf.c # TODO: link it as lib?
 	${THIRDPARTY_DIR}/duktape/src/duktape.c # TODO: link it as lib?
@@ -275,14 +280,11 @@ add_library(tic80core STATIC ${TIC80CORE_SRC})
 target_include_directories(tic80core PRIVATE ${CMAKE_SOURCE_DIR}/include)
 target_include_directories(tic80core PRIVATE ${THIRDPARTY_DIR}/blip-buf)
 target_include_directories(tic80core PRIVATE ${THIRDPARTY_DIR}/duktape/src)
-target_include_directories(tic80core PRIVATE ${THIRDPARTY_DIR}/lua-5.3.1/src)
-target_include_directories(tic80core PRIVATE ${THIRDPARTY_DIR}/giflib-5.1.4/lib)
 target_include_directories(tic80core PRIVATE ${THIRDPARTY_DIR}/wren/src/include)
 target_include_directories(tic80core PRIVATE ${THIRDPARTY_DIR}/squirrel/include)
 target_include_directories(tic80core PRIVATE ${THIRDPARTY_DIR}/moonscript)
 target_include_directories(tic80core PRIVATE ${THIRDPARTY_DIR}/fennel)
 
-add_dependencies(tic80core lua lpeg wren squirrel giflib)
 target_link_libraries(tic80core lua lpeg wren squirrel giflib)
 
 if(LINUX)
@@ -308,31 +310,23 @@ if(BUILD_SDL AND NOT EMSCRIPTEN)
 endif()
 
 ################################
-# SDL2 renderer example
+# SDL2 standalone cart player
 ################################
 
-set(EXAMPLE_DIR ${CMAKE_SOURCE_DIR}/examples)
-if(BUILD_SDL AND NOT EMSCRIPTEN AND NOT ANDROID)
-	set(EXAMPLE_SRC 
-		${EXAMPLE_DIR}/sdl/main.c
-	)
+if(BUILD_PLAYER)
 
-	if(WIN32)
-		add_executable(sdl-renderer WIN32 ${EXAMPLE_SRC})
-	else()
-		add_executable(sdl-renderer ${EXAMPLE_SRC})
-	endif()
+	add_executable(player-sdl WIN32 ${CMAKE_SOURCE_DIR}/src/player/sdl.c)
 
-	target_include_directories(sdl-renderer PRIVATE ${THIRDPARTY_DIR}/sdl2/include)
-	target_include_directories(sdl-renderer PRIVATE ${CMAKE_SOURCE_DIR}/include)
-	target_include_directories(sdl-renderer PRIVATE ${CMAKE_SOURCE_DIR}/src)
+	target_include_directories(player-sdl PRIVATE 
+		${THIRDPARTY_DIR}/sdl2/include 
+		${CMAKE_SOURCE_DIR}/include 
+		${CMAKE_SOURCE_DIR}/src)
 
 	if(MINGW)
-		target_link_libraries(sdl-renderer mingw32)
+		target_link_libraries(player-sdl mingw32)
 	endif()
 
-	add_dependencies(sdl-renderer tic80core SDL2-static SDL2main)
-	target_link_libraries(sdl-renderer tic80core SDL2-static SDL2main)
+	target_link_libraries(player-sdl tic80core SDL2-static SDL2main)
 endif()
 
 ################################
@@ -384,30 +378,23 @@ target_include_directories(sokol PRIVATE ${THIRDPARTY_DIR}/sokol)
 endif()
 
 ################################
-# Sokol renderer example
+# Sokol standalone cart player
 ################################
 
-if(BUILD_SOKOL)
-set(SOKOL_SRC 
-	${EXAMPLE_DIR}/sokol/main.c
-)
+if(BUILD_PLAYER AND BUILD_SOKOL)
 
-if(WIN32)
-	add_executable(sokol-renderer WIN32 ${SOKOL_SRC})
-else()
-	add_executable(sokol-renderer ${SOKOL_SRC})
-endif()
+	add_executable(player-sokol WIN32 ${CMAKE_SOURCE_DIR}/src/player/sokol.c)
 
-if(MINGW)
-	target_link_libraries(sokol-renderer mingw32)
-endif()
+	if(MINGW)
+		target_link_libraries(player-sokol mingw32)
+	endif()
 
-target_include_directories(sokol-renderer PRIVATE ${CMAKE_SOURCE_DIR}/include)
-target_include_directories(sokol-renderer PRIVATE ${THIRDPARTY_DIR}/sokol)
-target_include_directories(sokol-renderer PRIVATE ${CMAKE_SOURCE_DIR}/src)
+	target_include_directories(player-sokol PRIVATE 
+		${CMAKE_SOURCE_DIR}/include 
+		${THIRDPARTY_DIR}/sokol 
+		${CMAKE_SOURCE_DIR}/src)
 
-add_dependencies(sokol-renderer tic80core sokol)
-target_link_libraries(sokol-renderer tic80core sokol)
+	target_link_libraries(player-sokol tic80core sokol)
 endif()
 
 ################################
@@ -440,7 +427,6 @@ if(BUILD_LIBRETRO)
 		RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/lib
 	)
 
-	add_dependencies(tic80_libretro tic80core)
 	target_link_libraries(tic80_libretro tic80core)
 	set_target_properties(tic80_libretro PROPERTIES PREFIX "")
 endif()
@@ -513,37 +499,34 @@ if(ANDROID)
 endif()
 
 if(NOT EMSCRIPTEN)
-	add_dependencies(sdlgpu SDL2-static)
 	target_link_libraries(sdlgpu SDL2-static)
 endif()
 
 endif()
 
 ################################
-# SDL NET
+# CURL
 ################################
 
-if(BUILD_SDL)
-set(SDLNET_DIR ${THIRDPARTY_DIR}/SDL2_net-2.0.1)
-set(SDLNET_SRC 
-	${SDLNET_DIR}/SDLnet.c
-	${SDLNET_DIR}/SDLnetTCP.c
-	${SDLNET_DIR}/SDLnetselect.c
-)
-
-add_library(sdlnet STATIC ${SDLNET_SRC})
-target_include_directories(sdlnet PRIVATE ${THIRDPARTY_DIR}/sdl2/include)
+set(BUILD_SHARED_LIBS OFF CACHE BOOL "")
 
 if(WIN32)
-	target_link_libraries(sdlnet ws2_32)
+    set(CURL_STATIC_CRT ON CACHE BOOL "")
 endif()
-endif()
+
+set(CMAKE_USE_OPENSSL OFF CACHE BOOL "" )
+set(HTTP_ONLY ON CACHE BOOL "")
+set(BUILD_CURL_EXE OFF CACHE BOOL "")
+set(CURL_CA_BUNDLE "none" CACHE STRING "")
+set(CURL_CA_PATH "none" CACHE STRING "")
+
+add_subdirectory(${THIRDPARTY_DIR}/curl)
 
 ################################
 # ZLIB
 ################################
 
-set(ZLIB_DIR ${THIRDPARTY_DIR}/zlib-1.2.11)
+set(ZLIB_DIR ${THIRDPARTY_DIR}/zlib)
 set(ZLIB_SRC 
 	${ZLIB_DIR}/adler32.c
 	${ZLIB_DIR}/compress.c
@@ -559,22 +542,20 @@ set(ZLIB_SRC
 )
 
 add_library(zlib STATIC ${ZLIB_SRC})
+target_include_directories(zlib INTERFACE ${THIRDPARTY_DIR}/zlib)
 
 ################################
 # bin2txt
 ################################
 
 if(BUILD_DEMO_CARTS)
-	set(BIN2TXT_DIR ${CMAKE_SOURCE_DIR}/tools/bin2txt)
+	set(BIN2TXT_DIR ${CMAKE_SOURCE_DIR}/build/tools/bin2txt)
 	set(BIN2TXT_SRC 
 		${BIN2TXT_DIR}/bin2txt.c
 	)
 
 	add_executable(bin2txt ${BIN2TXT_SRC})
 
-	target_include_directories(bin2txt PRIVATE ${THIRDPARTY_DIR}/zlib-1.2.11)
-
-	add_dependencies(bin2txt zlib)
 	target_link_libraries(bin2txt zlib)
 
 	file(GLOB DEMO_CARTS ${CMAKE_SOURCE_DIR}/demos/*.tic )
@@ -589,7 +570,7 @@ if(BUILD_DEMO_CARTS)
 
 		get_filename_component(cart_name ${CART_FILE} NAME)
 
-		set(OUTNAME ${CMAKE_SOURCE_DIR}/bin/assets/${cart_name}.dat)
+		set(OUTNAME ${CMAKE_SOURCE_DIR}/build/assets/${cart_name}.dat)
 
 		list(APPEND DEMO_CARTS_OUT ${OUTNAME})
 
@@ -630,6 +611,7 @@ set(TIC80LIB_SRC
 	${TIC80LIB_DIR}/dialog.c
 	${TIC80LIB_DIR}/menu.c
 	${TIC80LIB_DIR}/surf.c
+	${TIC80LIB_DIR}/net.c
 )
 
 set(TIC80_OUTPUTS tic80)
@@ -643,16 +625,14 @@ foreach(TIC80_OUTPUT ${TIC80_OUTPUTS})
 	add_library(${TIC80_OUTPUT}lib STATIC ${TIC80LIB_SRC} ${DEMO_CARTS_OUT})
 
 	if(WIN32)
-		target_include_directories(${TIC80_OUTPUT}lib PRIVATE ${THIRDPARTY_DIR}/dirent)
+		target_include_directories(${TIC80_OUTPUT}lib PRIVATE ${THIRDPARTY_DIR}/dirent/include)
 	endif()
 
 	target_include_directories(${TIC80_OUTPUT}lib PRIVATE ${CMAKE_SOURCE_DIR}/include)
-	target_include_directories(${TIC80_OUTPUT}lib PRIVATE ${THIRDPARTY_DIR}/giflib-5.1.4/lib)
-	target_include_directories(${TIC80_OUTPUT}lib PRIVATE ${THIRDPARTY_DIR}/zlib-1.2.11)
 	target_include_directories(${TIC80_OUTPUT}lib PRIVATE ${THIRDPARTY_DIR}/lua-5.3.1/src)
+	target_include_directories(${TIC80_OUTPUT}lib PRIVATE ${THIRDPARTY_DIR}/curl/include)
 
-	add_dependencies(${TIC80_OUTPUT}lib tic80core zlib)
-	target_link_libraries(${TIC80_OUTPUT}lib tic80core zlib)
+	target_link_libraries(${TIC80_OUTPUT}lib tic80core zlib libcurl)
 
 endforeach()
 
@@ -673,7 +653,7 @@ foreach(TIC80_OUTPUT ${TIC80_OUTPUTS})
 		set(TIC80_SRC ${TIC80_SRC} ${CMAKE_SOURCE_DIR}/src/ext/file_dialog.m)
 	endif()
 
-	set(TIC80_SRC ${TIC80_SRC} ${CMAKE_SOURCE_DIR}/src/net.c src/system/sdlgpu.c)
+	set(TIC80_SRC ${TIC80_SRC} src/system/sdlgpu.c)
 
 	if(WIN32)
 		set(TIC80_SRC ${TIC80_SRC} build/windows/tic80.rc)
@@ -699,7 +679,6 @@ foreach(TIC80_OUTPUT ${TIC80_OUTPUTS})
 
 	target_include_directories(${TIC80_OUTPUT} PRIVATE ${CMAKE_SOURCE_DIR}/include)
 	target_include_directories(${TIC80_OUTPUT} PRIVATE ${CMAKE_SOURCE_DIR}/src)
-	target_include_directories(${TIC80_OUTPUT} PRIVATE ${THIRDPARTY_DIR}/SDL2_net-2.0.1)
 	target_include_directories(${TIC80_OUTPUT} PRIVATE ${THIRDPARTY_DIR}/sdl2/include)
 
 	target_include_directories(${TIC80_OUTPUT} PRIVATE ${THIRDPARTY_DIR}/sdl-gpu/include)
@@ -711,12 +690,10 @@ foreach(TIC80_OUTPUT ${TIC80_OUTPUTS})
 	if(EMSCRIPTEN)
 		set_target_properties(${TIC80_OUTPUT} PROPERTIES LINK_FLAGS "-s WASM=1 -s USE_SDL=2 -s TOTAL_MEMORY=67108864 --pre-js ${CMAKE_SOURCE_DIR}/build/html/prejs.js")		
 	elseif(NOT ANDROID)
-		add_dependencies(${TIC80_OUTPUT} SDL2main)
 		target_link_libraries(${TIC80_OUTPUT} SDL2main)
 	endif()
 
-	add_dependencies(${TIC80_OUTPUT} ${TIC80_OUTPUT}lib sdlnet sdlgpu)
-	target_link_libraries(${TIC80_OUTPUT} ${TIC80_OUTPUT}lib sdlnet sdlgpu)
+	target_link_libraries(${TIC80_OUTPUT} ${TIC80_OUTPUT}lib sdlgpu)
 
 	if(LINUX)
 		include(FindPkgConfig)
@@ -766,7 +743,6 @@ foreach(TIC80_OUTPUT ${TIC80_OUTPUTS})
 
 	target_include_directories(${TIC80_OUTPUT}-sokol PRIVATE ${CMAKE_SOURCE_DIR}/include)
 	target_include_directories(${TIC80_OUTPUT}-sokol PRIVATE ${CMAKE_SOURCE_DIR}/src)
-	target_include_directories(${TIC80_OUTPUT}-sokol PRIVATE ${THIRDPARTY_DIR}/SDL2_net-2.0.1)
 	target_include_directories(${TIC80_OUTPUT}-sokol PRIVATE ${THIRDPARTY_DIR}/sdl2/include)
 
 	target_include_directories(${TIC80_OUTPUT}-sokol PRIVATE ${THIRDPARTY_DIR}/sokol)
@@ -775,7 +751,6 @@ foreach(TIC80_OUTPUT ${TIC80_OUTPUTS})
 		target_link_libraries(${TIC80_OUTPUT}-sokol mingw32)
 	endif()
 
-	add_dependencies(${TIC80_OUTPUT}-sokol ${TIC80_OUTPUT}lib sokol)
 	target_link_libraries(${TIC80_OUTPUT}-sokol ${TIC80_OUTPUT}lib sokol)
 
 	if(LINUX)

@@ -22,302 +22,135 @@
 
 #include "net.h"
 #include "tic.h"
-#include "SDL_net.h"
 
 #include <stdlib.h>
 #include <stdio.h>
 
+#include <curl/curl.h>
+#include "../3rd-party/sdl2/include/SDL_thread.h"
+
 struct Net
 {
-	struct
-	{
-		u8* buffer;
-		s32 size;
-		char path[FILENAME_MAX];
-	} cache;
+	struct Curl_easy* curl;
 };
 
-#if defined(__EMSCRIPTEN__)
-
-static void getRequest(Net* net, const char* path, NetResponse callback, void* data)
-{
-	callback(NULL, 0, data);
-}
-
-#else
-
-static void netClearCache(Net* net)
-{
-	if(net->cache.buffer)
-		free(net->cache.buffer);
-
-	net->cache.buffer = NULL;
-	net->cache.size = 0;
-	memset(net->cache.path, 0, sizeof net->cache.path);
-}
-
 typedef struct
 {
-	const char *host;
-	u16 port;
-	const char *method;
-	const char *path;
-	u8 *data;
-	s32 size;
-	s32 timeout;
-	NetResponse streamCallback;
-	void *streamData;
-}Request;
+    void* buffer;
+    s32 size;
+} CurlData;
 
-typedef struct
+static size_t writeCallback(void *contents, size_t size, size_t nmemb, void *userp)
 {
-	char* header;
-	u8* content;
-	s32 contentLength;
-}Response;
+	CurlData* data = (CurlData*)userp;
 
-static Response httpRequest(Request* req)
+	const size_t total = size * nmemb;
+	data->buffer = realloc(data->buffer, data->size + total);
+	memcpy((u8*)data->buffer + data->size, contents, total);
+	data->size += total;
+
+	return total;
+}
+
+void* netGetRequest(Net* net, const char* url, s32* size)
 {
-	Response res = {.header = NULL, .content = NULL, .contentLength = 0};
+	CurlData data = {NULL, 0};
 
-	if(strlen(req->path) == 0)
-		req->path = "/";
-
+	if(net->curl)
 	{
-		IPaddress ip;
+		curl_easy_setopt(net->curl, CURLOPT_URL, url);
+		curl_easy_setopt(net->curl, CURLOPT_UPLOAD, 0L);
+		curl_easy_setopt(net->curl, CURLOPT_WRITEDATA, &data);
 
-		if(SDLNet_ResolveHost(&ip, req->host, req->port) >= 0)
-		{
-			TCPsocket sock = SDLNet_TCP_Open(&ip);
-
-			if(sock)
-			{
-				SDLNet_SocketSet set = SDLNet_AllocSocketSet(1);
-
-				if(set)
-				{
-					SDLNet_TCP_AddSocket(set, sock);
-
-					{
-						char header[FILENAME_MAX];
-						memset(header, 0, sizeof header);
-						sprintf(header, "%s %s HTTP/1.0\r\nHost: %s\r\nContent-Length: %d\r\n\r\n", req->method, req->path, req->host, req->size);
-						SDLNet_TCP_Send(sock, header, (s32)strlen(header));
-					}
-
-					if(req->data && req->size)
-						SDLNet_TCP_Send(sock, req->data, req->size);
-
-					if(SDLNet_CheckSockets(set, req->timeout) == 1 && SDLNet_SocketReady(sock))
-					{
-						enum {Size = 4*1024+1};
-						res.header = malloc(Size);
-
-						s32 headerSize = 0;
-						s32 responseSize = 0;
-						s32 expectedContentLength = -1;
-						s32 streamOffset = 0;
-
-						for(;;)
-						{
-							s32 size = SDLNet_TCP_Recv(sock, res.header + responseSize, Size - 1);
-
-							if(size > 0)
-							{
-								responseSize += size;
-								res.header = realloc(res.header, responseSize + Size);
-
-								if(headerSize == 0)
-								{
-									res.header[responseSize] = '\0';
-									char* headerEnd = strstr((char*)res.header, "\r\n\r\n");
-
-									if(headerEnd != NULL)
-									{
-										headerEnd[2] = headerEnd[3] = '\0';
-										headerSize = headerEnd + 4 - res.header;
-
-										{
-											static const char ContentLength[] = "\r\nContent-Length:";
-
-											char* start = strstr((char*)res.header, ContentLength);
-											if(start)
-												expectedContentLength = atoi(start + sizeof(ContentLength));
-										}
-
-										streamOffset = headerSize;
-									}
-								}
-
-								if(headerSize != 0)
-								{
-									if(req->streamCallback)
-									{
-										bool wantMore = req->streamCallback(res.header + streamOffset, responseSize - streamOffset, req->streamData);
-										if(!wantMore)
-											break;
-										streamOffset = responseSize;
-									}
-
-									if(expectedContentLength >= 0 && res.contentLength >= expectedContentLength)
-										break;
-								}
-							}
-							else break;
-						}
-
-						res.content = res.header + headerSize;
-						res.contentLength = responseSize - headerSize;
-					}
-					
-					SDLNet_FreeSocketSet(set);
-				}
-
-				SDLNet_TCP_Close(sock);
-			}
-		}
+		if(curl_easy_perform(net->curl) != CURLE_OK)
+			return NULL;
 	}
 
-	return res;
+	*size = data.size;
+
+    return data.buffer;
 }
 
-static void getRequest(Net* net, const char *host, u16 port, const char* path, NetResponse callback, void* data)
+static size_t readCallback(void *contents, size_t size, size_t nmemb, void *userp)
 {
-	if(strcmp(host, TIC_HOST) == 0 && port == 80 && strcmp(net->cache.path, path) == 0)
+	CurlData* data = (CurlData*)userp;
+
+	size_t total = MIN(size * nmemb, data->size);
+
+	memcpy((u8*)contents, data->buffer, total);
+
+	data->buffer += total;
+	data->size -= total;
+
+	return total;
+}
+
+void netPutRequest(Net* net, const char *url, void *content, s32 size)
+{
+	CurlData data = {content, size};
+
+	if(net->curl)
 	{
-		callback(net->cache.buffer, net->cache.size, data);
+		curl_easy_setopt(net->curl, CURLOPT_URL, url);
+		curl_easy_setopt(net->curl, CURLOPT_UPLOAD, 1L);
+		curl_easy_setopt(net->curl, CURLOPT_READDATA, &data);
+  		curl_easy_setopt(net->curl, CURLOPT_INFILESIZE, size);
+
+		curl_easy_perform(net->curl);
 	}
-	else
-	{
-		netClearCache(net);
-
-		bool done = false;
-
-		Request req =
-		{
-			.host = host,
-			.port = port,
-			.method = "GET",
-			.path = path,
-			.timeout = 3000
-		};
-		Response res = httpRequest(&req);
-
-		if(res.header)
-		{
-			if(strstr(res.header, "200 OK"))
-			{
-				if(res.content && res.contentLength)
-				{
-					strcpy(net->cache.path, path);
-					net->cache.size = res.contentLength;
-					net->cache.buffer = (u8*)malloc(net->cache.size);
-					memcpy(net->cache.buffer, res.content, net->cache.size);
-					callback(net->cache.buffer, net->cache.size, data);
-					done = true;
-				}
-			}
-
-			free(res.header);
-		}
-
-		if(!done)
-			callback(NULL, 0, data);
-	}
-}
-
-static void putRequest(Net* net, const char *host, u16 port, const char* path, void* data, s32 dataSize)
-{
-	netClearCache(net);
-
-	bool done = false;
-
-	Request req =
-	{
-		.host = host,
-		.port = port,
-		.method = "PUT",
-		.path = path,
-		.data = data,
-		.size = dataSize,
-		.timeout = 3000
-	};
-	Response res = httpRequest(&req);
-
-	if(res.header)
-		free(res.header);
-}
-
-#endif
-
-typedef struct
-{
-	void* buffer;
-	s32* size;
-} NetGetData;
-
-static bool onGetResponse(u8* buffer, s32 size, void* data)
-{
-	NetGetData* netGetData = (NetGetData*)data;
-
-	netGetData->buffer = malloc(size);
-	*netGetData->size = size;
-	memcpy(netGetData->buffer, buffer, size);
-
-	return true;
-}
-
-void* netGetRequest(Net* net, const char *host, u16 port, const char* path, s32* size)
-{
-	NetGetData netGetData = {NULL, size};
-	getRequest(net, host, port, path, onGetResponse, &netGetData);
-
-	return netGetData.buffer;
-}
-
-void netPutRequest(Net* net, const char *host, u16 port, const char* path, void *data, s32 size)
-{
-	putRequest(net, host, port, path, data, size);
 }
 
 typedef struct
 {
 	bool cancel;
-	Net *net;
-	char host[FILENAME_MAX];
-	char path[FILENAME_MAX];
-	Request req;
+	char url[FILENAME_MAX];
 	NetResponse callback;
 	void* data;
 }NetStreamData;
 
-bool netStreamCallback(u8* buffer, s32 size, void* data)
+size_t streamCallback(char *ptr, size_t size, size_t nmemb, void *userdata)
 {
-	NetStreamData* stream = (NetStreamData*)data;
+	NetStreamData* stream = (NetStreamData*)userdata;
 
+	size_t total = size * nmemb;
+	
 	if(stream->callback)
 	{
-		if(!stream->callback(buffer, size, stream->data))
+		if(!stream->callback(ptr, total, stream->data))
 		{
 			stream->cancel = true;
-			return false;
+			return 0;
 		}
 	}
 
-	return true;
+	return total;
 }
 
 int SDLCALL netStreamThread(void *data)
 {
 	NetStreamData* stream = (NetStreamData*)data;
 
+	struct Curl_easy* curl = curl_easy_init();
+
+	curl_easy_setopt(curl, CURLOPT_URL, stream->url);
+	curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, streamCallback);
+	curl_easy_setopt(curl, CURLOPT_WRITEDATA, stream);
+
 	while(!stream->cancel)
-		httpRequest(&stream->req);
+	{
+		if(curl_easy_perform(curl) != CURLE_OK)
+		{
+			// $$$ Sleep for awhile before trying again.
+			break;
+		}
+	}
+
+	curl_easy_cleanup(curl);
 
 	free(stream);
 }
 
-void netGetStream(Net* net, const char *host, u16 port, const char* path, NetResponse callback, void* data)
+void netGetStream(Net* net, const char *url, NetResponse callback, void* data)
 {
 	NetStreamData* stream = (NetStreamData*)malloc(sizeof(NetStreamData));
 
@@ -325,25 +158,12 @@ void netGetStream(Net* net, const char *host, u16 port, const char* path, NetRes
 	{
 		*stream = (NetStreamData)
 		{
-			.net = net,
 			.cancel = false,
 			.callback = callback,
 			.data = data
 		};
 
-		snprintf(stream->host, sizeof(stream->host), "%s", host);
-		snprintf(stream->path, sizeof(stream->path), "%s", path);
-
-		stream->req = (Request)
-		{
-			.host = stream->host,
-			.port = port,
-			.method = "GET",
-			.path = stream->path,
-			.timeout = 3000,
-			.streamCallback = netStreamCallback,
-			.streamData = stream,
-		};
+		snprintf(stream->url, sizeof(stream->url), "%s", url);
 
 		SDL_Thread *thread = SDL_CreateThread(netStreamThread, "stream thread", stream);
 		if(thread)
@@ -353,26 +173,23 @@ void netGetStream(Net* net, const char *host, u16 port, const char* path, NetRes
 
 Net* createNet()
 {
-	SDLNet_Init();
-
 	Net* net = (Net*)malloc(sizeof(Net));
 
 	*net = (Net)
 	{
-		.cache = 
-		{
-			.buffer = NULL,
-			.size = 0,
-			.path = {0},
-		},
+		.curl = curl_easy_init()
 	};
+
+	curl_easy_setopt(net->curl, CURLOPT_READFUNCTION, readCallback);
+	curl_easy_setopt(net->curl, CURLOPT_WRITEFUNCTION, writeCallback);
 
 	return net;
 }
 
 void closeNet(Net* net)
 {
+	if(net->curl)
+		curl_easy_cleanup(net->curl);
+
 	free(net);
-	
-	SDLNet_Quit();
 }

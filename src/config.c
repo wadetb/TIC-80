@@ -278,7 +278,7 @@ static void readConfig(Config* config)
 
 static void update(Config* config, const u8* buffer, size_t size)
 {
-	config->tic->api.load(&config->cart, buffer, size, true);
+	config->tic->api.load(&config->cart, buffer, size);
 
 	readConfig(config);
 	studioConfigChanged();
@@ -293,7 +293,7 @@ static void setDefault(Config* config)
 	{
 		static const u8 DefaultBiosZip[] = 
 		{
-			#include "../bin/assets/config.tic.dat"
+			#include "../build/assets/config.tic.dat"
 		};
 
 		u8* embedBios = NULL;

@@ -162,7 +162,7 @@ typedef struct
 	bool (*key)					(tic_mem* memory, tic_key key);
 	bool (*keyp)				(tic_mem* memory, tic_key key, s32 hold, s32 period);
 
-	void (*load)				(tic_cartridge* rom, const u8* buffer, s32 size, bool palette);
+	void (*load)				(tic_cartridge* rom, const u8* buffer, s32 size);
 	s32  (*save)				(const tic_cartridge* rom, u8* buffer);
 
 	void (*tick_start)			(tic_mem* memory, const tic_sfx* sfx, const tic_music* music);
@@ -179,7 +179,6 @@ struct tic_mem
 	tic_cartridge 		collab;
 	tic_font 			font;
 	tic_api 			api;
-	tic_persistent		persistent;
 
 	char saveid[TIC_SAVEID_SIZE];
 
