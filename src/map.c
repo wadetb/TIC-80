@@ -893,13 +893,14 @@ static void drawMapOvr(Map* map)
 					u8 t = collab_isChanged(map->collab, mapX + ((mapY + TIC_MAP_HEIGHT - 1) % TIC_MAP_HEIGHT) * TIC_MAP_WIDTH);
 					u8 b = collab_isChanged(map->collab, mapX + ((mapY + 1) % TIC_MAP_HEIGHT) * TIC_MAP_WIDTH);
 
-					s32 sx = x - scrollX;
-					s32 sy = y - scrollY;
+					s32 sx = x - scrollX + 1;
+					s32 sy = y - scrollY + 1;
+					s32 sz = TIC_SPRITESIZE - 2;
 
-					if(!l) tic->api.line(tic, sx, sy, sx, sy + TIC_SPRITESIZE, (tic_color_yellow));
-					if(!r) tic->api.line(tic, sx + TIC_SPRITESIZE, sy, sx + TIC_SPRITESIZE, sy + TIC_SPRITESIZE, (tic_color_yellow));
-					if(!t) tic->api.line(tic, sx, sy, sx + TIC_SPRITESIZE, sy, (tic_color_yellow));
-					if(!b) tic->api.line(tic, sx, sy + TIC_SPRITESIZE, sx + TIC_SPRITESIZE, sy + TIC_SPRITESIZE, (tic_color_yellow));
+					if(!l) tic->api.line(tic, sx, sy, sx, sy + sz, (tic_color_yellow));
+					if(!r) tic->api.line(tic, sx + sz, sy, sx + sz, sy + sz, (tic_color_yellow));
+					if(!t) tic->api.line(tic, sx, sy, sx + sz, sy, (tic_color_yellow));
+					if(!b) tic->api.line(tic, sx, sy + sz, sx + sz, sy + sz, (tic_color_yellow));
 				}
 			}
 		}
