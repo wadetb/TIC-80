@@ -1190,13 +1190,6 @@ static void openSystemPath(const char* path) {}
 
 #endif
 
-typedef struct
-{
-	char host[1024];
-	s16 port;
-	char path[1024];
-} URLParts;
-
 static void* getUrlRequest(const char* url, s32* size)
 {
 	return netGetRequest(platform.net, url, size);
@@ -1333,7 +1326,6 @@ static System systemInterface =
 
 	.getUrlRequest = getUrlRequest,
 	.putUrlRequest = putUrlRequest,
-
 	.getUrlStream = getUrlStream,
 
 	.fileDialogLoad = file_dialog_load,

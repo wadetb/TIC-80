@@ -27,7 +27,7 @@
 #include <stdio.h>
 
 #include <curl/curl.h>
-#include "../3rd-party/sdl2/include/SDL.h"
+#include <SDL.h>
 
 struct Net
 {
