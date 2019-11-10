@@ -27,7 +27,7 @@
 #include <stdio.h>
 
 #include <curl/curl.h>
-#include "../3rd-party/sdl2/include/SDL_thread.h"
+#include "../3rd-party/sdl2/include/SDL.h"
 
 struct Net
 {
@@ -97,7 +97,7 @@ void netPutRequest(Net* net, const char *url, void *content, s32 size)
   	headers = curl_slist_append(headers, contentLength);
  	headers = curl_slist_append(headers, "Expect:");
  	headers = curl_slist_append(headers, "Transfer-Encoding:");
-	 
+
 	curl_easy_setopt(curl, CURLOPT_PUT, 1);
 	curl_easy_setopt(curl, CURLOPT_URL, url);
 	curl_easy_setopt(curl, CURLOPT_HTTPHEADER, headers);
@@ -151,10 +151,7 @@ int SDLCALL netStreamThread(void *data)
 	while(!stream->cancel)
 	{
 		if(curl_easy_perform(curl) != CURLE_OK)
-		{
-			// $$$ Sleep for awhile before trying again.
-			break;
-		}
+			SDL_Delay(1000);
 	}
 
 	curl_easy_cleanup(curl);

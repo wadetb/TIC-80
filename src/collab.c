@@ -182,8 +182,6 @@ static bool collab_streamCallback(u8* buffer, s32 size, void* data)
 	if(impl.streamCounter != (s32)(uintptr_t)data)
 		return false;
 
-	printf("stream callback %d\n", size);
-
 	if(impl.streamPos + size > impl.streamSize)
 	{
 		impl.streamSize = impl.streamPos + size;
@@ -201,8 +199,6 @@ static bool collab_streamCallback(u8* buffer, s32 size, void* data)
 			continue;
 		if(chunk->offset + chunk->size > sizeof(tic_cartridge))
 			chunk->size = sizeof(tic_cartridge) - chunk->offset;
-
-		printf("got chunk %d %d\n", chunk->offset, chunk->size);
 
 		char url[1024];
 		snprintf(url, sizeof(url), "/?offset=%d&size=%d", chunk->offset, chunk->size);
