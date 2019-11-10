@@ -59,7 +59,6 @@ void* netGetRequest(Net* net, const char* url, s32* size)
 	if(net->curl)
 	{
 		curl_easy_setopt(net->curl, CURLOPT_URL, url);
-		curl_easy_setopt(net->curl, CURLOPT_UPLOAD, 0L);
 		curl_easy_setopt(net->curl, CURLOPT_WRITEDATA, &data);
 
 		if(curl_easy_perform(net->curl) != CURLE_OK)
@@ -89,15 +88,28 @@ void netPutRequest(Net* net, const char *url, void *content, s32 size)
 {
 	CurlData data = {content, size};
 
-	if(net->curl)
-	{
-		curl_easy_setopt(net->curl, CURLOPT_URL, url);
-		curl_easy_setopt(net->curl, CURLOPT_UPLOAD, 1L);
-		curl_easy_setopt(net->curl, CURLOPT_READDATA, &data);
-  		curl_easy_setopt(net->curl, CURLOPT_INFILESIZE, size);
+	struct Curl_easy* curl = curl_easy_init();
 
-		curl_easy_perform(net->curl);
-	}
+	struct curl_slist *headers = NULL;
+
+	char contentLength[1024];
+	snprintf(contentLength, sizeof(contentLength), "Content-Length: %d", size);
+  	headers = curl_slist_append(headers, contentLength);
+ 	headers = curl_slist_append(headers, "Expect:");
+ 	headers = curl_slist_append(headers, "Transfer-Encoding:");
+	 
+	curl_easy_setopt(curl, CURLOPT_PUT, 1);
+	curl_easy_setopt(curl, CURLOPT_URL, url);
+	curl_easy_setopt(curl, CURLOPT_HTTPHEADER, headers);
+	curl_easy_setopt(curl, CURLOPT_READFUNCTION, readCallback);
+	curl_easy_setopt(curl, CURLOPT_READDATA, &data);
+	curl_easy_setopt(curl, CURLOPT_INFILESIZE, size);
+
+	curl_easy_perform(curl);
+
+	curl_slist_free_all(headers);
+
+	curl_easy_cleanup(curl);
 }
 
 typedef struct
@@ -180,7 +192,6 @@ Net* createNet()
 		.curl = curl_easy_init()
 	};
 
-	curl_easy_setopt(net->curl, CURLOPT_READFUNCTION, readCallback);
 	curl_easy_setopt(net->curl, CURLOPT_WRITEFUNCTION, writeCallback);
 
 	return net;

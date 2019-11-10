@@ -730,6 +730,8 @@ static void pushToServer(Code* code)
 		free(lines.offsets);
 		free(serverLines.offsets);
 	}
+
+	diff(code);
 }
 
 static void pullFromServer(Code* code)

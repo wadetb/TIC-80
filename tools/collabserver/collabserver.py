@@ -132,7 +132,6 @@ class CollabRequestHandler(http.server.BaseHTTPRequestHandler):
                         if offset is None:
                             break
                         self.wfile.write(prefix + struct.pack('<ii', offset, size) + suffix)
-                        print('write {} bytes\n', size)
 
                     self.wfile.write('0\r\n\r\n'.encode())
 
@@ -150,6 +149,7 @@ class CollabRequestHandler(http.server.BaseHTTPRequestHandler):
                 tic.signal_update(offset, size)
 
                 self.send_response(200)
+                self.send_header('Content-Length', '0')
                 self.end_headers()
 
         except ValueError:
