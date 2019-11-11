@@ -897,10 +897,10 @@ static void drawMapOvr(Map* map)
 					s32 sy = y - scrollY + 1;
 					s32 sz = TIC_SPRITESIZE - 2;
 
-					if(!l) tic->api.line(tic, sx, sy, sx, sy + sz, (tic_color_yellow));
-					if(!r) tic->api.line(tic, sx + sz, sy, sx + sz, sy + sz, (tic_color_yellow));
-					if(!t) tic->api.line(tic, sx, sy, sx + sz, sy, (tic_color_yellow));
-					if(!b) tic->api.line(tic, sx, sy + sz, sx + sz, sy + sz, (tic_color_yellow));
+					if(!l) drawDiffRect(tic, sx, sy, 1, sz + 1);
+					if(!r) drawDiffRect(tic, sx + sz, sy, 1, sz + 1);
+					if(!t) drawDiffRect(tic, sx, sy, sz + 1, 1);
+					if(!b) drawDiffRect(tic, sx, sy + sz, sz + 1, 1);
 				}
 			}
 		}

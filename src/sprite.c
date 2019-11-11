@@ -1074,7 +1074,7 @@ static void drawPaletteOvr(Sprite* sprite, s32 x, s32 y)
 		for(s32 row = 0, i = 0; row < PALETTE_ROWS; row++)
 			for(s32 col = 0; col < PALETTE_COLS; col++, i++)
 				if(memcmp(&mine[i], &server[i], sizeof(tic_rgb)))
-					sprite->tic->api.rect_border(sprite->tic, x + col * PALETTE_CELL_SIZE, y + row * PALETTE_CELL_SIZE, PALETTE_CELL_SIZE-1, PALETTE_CELL_SIZE-1, (tic_color_yellow));
+					drawDiffRect(sprite->tic, x + col * PALETTE_CELL_SIZE, y + row * PALETTE_CELL_SIZE, PALETTE_CELL_SIZE-1, PALETTE_CELL_SIZE-1);
 	}
 
 	{
@@ -1190,10 +1190,14 @@ static void drawSheetOvr(Sprite* sprite, s32 x, s32 y)
 						    b = true;
 					}
 
-					if(!l) sprite->tic->api.line(sprite->tic, x + i, y + j, x + i, y + j + TIC_SPRITESIZE - 1, (tic_color_yellow));
-					if(!r) sprite->tic->api.line(sprite->tic, x + i + TIC_SPRITESIZE - 1, y + j, x + i + TIC_SPRITESIZE - 1, y + j + TIC_SPRITESIZE - 1, (tic_color_yellow));
-					if(!t) sprite->tic->api.line(sprite->tic, x + i, y + j, x + i + TIC_SPRITESIZE - 1, y + j, (tic_color_yellow));
-					if(!b) sprite->tic->api.line(sprite->tic, x + i, y + j + TIC_SPRITESIZE - 1, x + i + TIC_SPRITESIZE - 1, y + j + TIC_SPRITESIZE - 1, (tic_color_yellow));
+					s32 tx = x + i;
+					s32 ty = y + j;
+					s32 sz = TIC_SPRITESIZE;
+
+					if(!l) drawDiffRect(sprite->tic, tx, ty, 1, sz);
+					if(!r) drawDiffRect(sprite->tic, tx + sz - 1, ty, 1, sz);
+					if(!t) drawDiffRect(sprite->tic, tx, ty, sz, 1);
+					if(!b) drawDiffRect(sprite->tic, tx, ty + sz - 1, sz, 1);
 				}
 			}
 		}

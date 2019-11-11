@@ -148,6 +148,7 @@ void showTooltip(const char* text);
 
 bool collabEnabled();
 bool collabShowDiffs();
+void drawDiffRect(tic_mem *tic, s32 x, s32 y, s32 w, s32 h);
 void onCollabChanges();
 void setCollabUrl(const char* collabUrl, bool initPlz);
 char* getCollabUrl();

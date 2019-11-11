@@ -151,11 +151,10 @@ static struct
 
 	struct
 	{
+		s32 counter;
 		bool enabled;
 		bool showDiffs;
 		char url[FILENAME_MAX];
-		u32 streamCounter;
-		u32 changed;
 	} collab;
 
 	struct
@@ -1256,6 +1255,52 @@ bool collabShowDiffs()
 	return impl.collab.enabled && impl.collab.showDiffs;
 }
 
+void drawDiffRect(tic_mem *tic, s32 x, s32 y, s32 w, s32 h)
+{
+	tic->api.rect_border(tic, x, y, w, h, (tic_color_yellow));
+
+/*
+	tic->api.pixel(tic, x, y, (tic_color_brown));
+	if(w>1) tic->api.pixel(tic, x + w - 1, y, (tic_color_brown));
+	if(h>1) tic->api.pixel(tic, x, y + h - 1, (tic_color_brown));
+	if(w>1 && h>1) tic->api.pixel(tic, x + w - 1, y + h - 1, (tic_color_brown));
+*/
+
+/*
+	if(w>1)
+	{
+		s32 x1 = MIN(MAX(-5 + impl.collab.counter + (TIC80_HEIGHT-y), x), x+w-1);
+		s32 x2 = MIN(MAX( 5 + impl.collab.counter + (TIC80_HEIGHT-y), x), x+w-1);
+		if(x2 != x1) 
+			tic->api.line(tic, x1, y, x2, y, (tic_color_white));
+	}
+
+	if(w>1 && h>1)
+	{
+		s32 x1 = MIN(MAX(-5 + impl.collab.counter + (TIC80_HEIGHT-(y+h-1)), x), x+w-1);
+		s32 x2 = MIN(MAX( 5 + impl.collab.counter + (TIC80_HEIGHT-(y+h-1)), x), x+w-1);
+		if(x2 != x1) 
+			tic->api.line(tic, x1, y+h-1, x2, y+h-1, (tic_color_white));
+	}
+
+	if(h>1)
+	{
+		s32 y1 = MIN(MAX(-5 + impl.collab.counter + (TIC80_WIDTH-x), y), y+h-1);
+		s32 y2 = MIN(MAX( 5 + impl.collab.counter + (TIC80_WIDTH-x), y), y+h-1);
+		if(y2 != y1) 
+			tic->api.line(tic, x, y1, x, y2, (tic_color_white));
+	}
+
+	if(w>1 && h>1)
+	{
+		s32 y1 = MIN(MAX(-5 + impl.collab.counter + (TIC80_WIDTH-(x+w-1)), y), y+h-1);
+		s32 y2 = MIN(MAX( 5 + impl.collab.counter + (TIC80_WIDTH-(x+w-1)), y), y+h-1);
+		if(y2 != y1) 
+			tic->api.line(tic, x+w-1, y1, x+w-1, y2, (tic_color_white));
+	}
+*/
+}
+
 void toggleShowDiffs()
 {
 	impl.collab.showDiffs = !impl.collab.showDiffs;
@@ -1791,6 +1836,10 @@ static void renderStudio()
 	}
 
 	drawPopup();
+
+	impl.collab.counter -= 3;
+	if(impl.collab.counter < 0)
+		impl.collab.counter = 600;
 
 	if(getConfig()->noSound)
 		memset(tic->ram.registers, 0, sizeof tic->ram.registers);

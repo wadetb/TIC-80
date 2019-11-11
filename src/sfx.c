@@ -158,7 +158,7 @@ static void drawStereoSwitch(Sfx* sfx, s32 x, s32 y)
 		sfx->tic->api.text(sfx->tic, "L", x, y, effect->stereo_left ? tic_color_dark_gray : tic_color_white, false);
 
 		if(collabShowDiffs() && (effect->stereo_left != server->stereo_left))
-			sfx->tic->api.rect(sfx->tic, x, y+6, 5, 1, tic_color_yellow);
+			drawDiffRect(sfx->tic, x, y+6, 5, 1);
 	}
 
 	{
@@ -177,7 +177,7 @@ static void drawStereoSwitch(Sfx* sfx, s32 x, s32 y)
 		sfx->tic->api.text(sfx->tic, "R", x, y, effect->stereo_right ? tic_color_dark_gray : tic_color_white, false);
 
 		if(collabShowDiffs() && (effect->stereo_right != server->stereo_right))
-			sfx->tic->api.rect(sfx->tic, x, y+6, 5, 1, tic_color_yellow);
+			drawDiffRect(sfx->tic, x, y+6, 5, 1);
 	}
 }
 
@@ -418,7 +418,7 @@ static void drawCanvasTabs(Sfx* sfx, s32 x, s32 y)
 		sfx->tic->api.text(sfx->tic, Labels[i], rect.x, rect.y, i == sfx->canvasTab ? (tic_color_white) : (tic_color_dark_gray), false);
 
 		if(collabShowDiffs() && changed[i])
-			sfx->tic->api.rect(sfx->tic, rect.x + size, rect.y, 1, 5, (tic_color_yellow));
+			drawDiffRect(sfx->tic, rect.x + size, rect.y, 1, 5);
 	}
 
 	switch(sfx->canvasTab)
@@ -549,7 +549,7 @@ static void drawCanvas(Sfx* sfx, s32 x, s32 y)
 		if(loop->start > 0 || loop->size > 0)
 		{
 			for(s32 i = 0; i < loop->size; i++)
-				sfx->tic->api.rect(sfx->tic, x + (loop->start+i) * CANVAS_SIZE+1, y + CANVAS_HEIGHT - 2, CANVAS_SIZE-1, 2, (tic_color_yellow));
+				drawDiffRect(sfx->tic, x + (loop->start+i) * CANVAS_SIZE+1, y + CANVAS_HEIGHT - 2, CANVAS_SIZE-1, 2);
 		}
 	}
 }
@@ -1042,7 +1042,7 @@ static void drawWaveformBar(Sfx* sfx, s32 x, s32 y)
 			sfx->tic->api.rect_border(sfx->tic, rect.x-2, rect.y-2, rect.w+4, rect.h+4, (tic_color_white));
 
 		if(collabShowDiffs() && collab_isChanged(sfx->collab.waveform, i))
-			sfx->tic->api.rect_border(sfx->tic, rect.x+1, rect.y+1, rect.w-2, rect.h-2, (tic_color_yellow));
+			drawDiffRect(sfx->tic, rect.x+1, rect.y+1, rect.w-2, rect.h-2);
 		
 		{
 			tic_waveform* wave = getWaveformById(sfx, i);

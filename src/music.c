@@ -1415,13 +1415,13 @@ static void drawTrackerChannel(Music* music, s32 x, s32 y, s32 channel)
 			if (rect.h > 1 && i >= rect.y && i < rect.y + rect.h)
 			{
 				s32 sx = x - 1;
-				tic->api.rect(tic, sx, rowy - 1, CHANNEL_COLS * TIC_FONT_WIDTH + 1, TIC_FONT_HEIGHT + 1, (tic_color_yellow));
+				tic->api.rect(tic, sx, rowy - 1, CHANNEL_COLS * TIC_FONT_WIDTH + 1, TIC_FONT_HEIGHT + 1, (tic_color_white));
 			}
 		}
 
 		if (checkPlayRow(music, i))
 		{
-			music->tic->api.rect(music->tic, x - 1, rowy - 1, Width, TIC_FONT_HEIGHT + 1, (tic_color_white));
+			music->tic->api.rect(music->tic, x - 1, rowy - 1, Width, TIC_FONT_HEIGHT + 1, (tic_color_red));
 		}
 
 		char rowStr[] = "--------";
@@ -1480,7 +1480,7 @@ static void drawTrackerChannel(Music* music, s32 x, s32 y, s32 channel)
 	{
 		s32 patternId = tic_tool_get_pattern_id(getTrack(music), music->tracker.frame, channel);
 		if(patternId && collab_isChanged(music->collab.patterns, patternId - PATTERN_START))
-			music->tic->api.rect_border(music->tic, rect.x, rect.y, rect.w, rect.h, (tic_color_yellow));
+			drawDiffRect(music->tic, rect.x, rect.y, rect.w, rect.h);
 	}
 }
 
@@ -1528,7 +1528,7 @@ static void drawTracker(Music* music, s32 x, s32 y)
 		s32 patternId = tic_tool_get_pattern_id(getTrack(music), music->tracker.frame, i);
 		s32 serverPatternId = tic_tool_get_pattern_id(serverTrack, music->tracker.frame, i);
 		
-		u8 color = patternId != serverPatternId ? (tic_color_yellow) : (tic_color_white);
+		u8 color = (collabShowDiffs() && patternId != serverPatternId) ? (tic_color_yellow) : (tic_color_white);
 
 		drawEditbox(music, x + ChannelWidth * i + 2*TIC_FONT_WIDTH, y - 11, color, patternId, setChannelPattern, i);
 		drawTumbler(music, x + ChannelWidth * i + 7*TIC_FONT_WIDTH, y - 11, i);

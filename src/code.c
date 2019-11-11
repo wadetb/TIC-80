@@ -137,7 +137,7 @@ static void drawCode(Code* code, bool withCursor)
 			{
 				s32 y = code->rect.y - code->scroll.y * STUDIO_TEXT_HEIGHT + edit->line * STUDIO_TEXT_HEIGHT - 1;
 				if(y >= -TIC_FONT_HEIGHT && y < TIC80_HEIGHT)
-					code->tic->api.rect(code->tic, TIC80_WIDTH - 1, y, 1, TIC_FONT_HEIGHT, (tic_color_yellow));
+					drawDiffRect(code->tic, TIC80_WIDTH - 1, y, 1, TIC_FONT_HEIGHT);
 			}
 		}
 	}
