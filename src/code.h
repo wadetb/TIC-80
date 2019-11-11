@@ -26,6 +26,7 @@
 
 typedef struct Code Code;
 typedef struct OutlineItem OutlineItem;
+typedef struct Edit Edit;
 
 typedef struct Collab Collab;
 
@@ -74,8 +75,9 @@ struct Code
 	struct
 	{
 		Collab* collab;
-		s32* lines;
-		s32 lineCount;
+		
+		Edit* edits;
+		s32 editCount;
 	} collab;
 
 	enum

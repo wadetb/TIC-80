@@ -40,14 +40,16 @@ struct OutlineItem
 #define OUTLINE_SIZE ((TIC80_HEIGHT - TOOLBAR_SIZE*2)/TIC_FONT_HEIGHT)
 #define OUTLINE_ITEMS_SIZE (OUTLINE_SIZE * sizeof(OutlineItem))
 
-#define EDIT_INSERT (0 << 30)
-#define EDIT_DELETE (1 << 30)
-#define EDIT_SAME   (2 << 30)
-#define EDIT_MASK   (3 << 30)
+#define EDIT_INSERT 0
+#define EDIT_DELETE 1
+#define EDIT_SAME   2
 
-#define STATE_SAME    0
-#define STATE_NEW     1
-#define STATE_CHANGED 2
+struct Edit
+{
+	s32 kind;
+	s32 sourceLine;
+	s32 line;
+};
 
 static void diff(Code *code);
 
@@ -128,15 +130,15 @@ static void drawCode(Code* code, bool withCursor)
 
 	if(collabShowDiffs())
 	{
-		s32 y = code->rect.y - code->scroll.y * STUDIO_TEXT_HEIGHT;
-		for(s32 line = 0; line < code->collab.lineCount; line++)
+		for(s32 i = 0; i < code->collab.editCount; i++)
 		{
-			if(y >= -TIC_FONT_HEIGHT && y < TIC80_HEIGHT)
+			Edit* edit = &code->collab.edits[i];
+			if(edit->kind != EDIT_SAME)
 			{
-				if(code->collab.lines[line] != STATE_SAME)
-					code->tic->api.rect(code->tic, TIC80_WIDTH - 1, y - 1, 1, TIC_FONT_HEIGHT, (tic_color_yellow));
+				s32 y = code->rect.y - code->scroll.y * STUDIO_TEXT_HEIGHT + edit->line * STUDIO_TEXT_HEIGHT - 1;
+				if(y >= -TIC_FONT_HEIGHT && y < TIC80_HEIGHT)
+					code->tic->api.rect(code->tic, TIC80_WIDTH - 1, y, 1, TIC_FONT_HEIGHT, (tic_color_yellow));
 			}
-			y += STUDIO_TEXT_HEIGHT;
 		}
 	}
 
@@ -671,28 +673,17 @@ static s32 offsetToLine(s32 offset, Lines *lines)
 	return l;
 }
 
-static char* replaceLines(Lines* to, Lines* from, s32 start, s32 end)
+static void addLine(char* src, s32* pos, Lines* lines, s32 line)
 {
-	s32 toStart = MIN(start, to->count - 1);
-	s32 toEnd = MIN(end, to->count - 1);
+	s32 offset = lines->offsets[line];
+	s32 length = lines->offsets[line + 1] - offset;
 
-	s32 fromStart = MIN(start, from->count - 1);
-	s32 fromEnd = MIN(end, from->count - 1);
+	if(*pos + length > TIC_CODE_SIZE)
+		length = TIC_CODE_SIZE - *pos;
 
-	char* prefix = to->text;
-	s32 prefixLen = to->offsets[toStart];
+	memcpy(src + *pos, lines->text + offset, length);
 
-	char* mid = from->text + from->offsets[fromStart];
-	s32 midLen = from->offsets[fromEnd + 1] - from->offsets[fromStart];
-
-	char* suffix = to->text + to->offsets[toEnd + 1];
-	s32 suffixLen = to->offsets[to->count] - to->offsets[toEnd + 1];
-
-	s32 newSize = prefixLen + midLen + suffixLen + 1;
-	char* newSrc = (char*)malloc(newSize);
-	snprintf(newSrc, newSize, "%.*s%.*s%.*s", prefixLen, prefix, midLen, mid, suffixLen, suffix);
-
-	return newSrc;
+	*pos += length;
 }
 
 static void pushToServer(Code* code)
@@ -718,8 +709,28 @@ static void pushToServer(Code* code)
 		char* backupSrc = (char*)malloc(TIC_CODE_SIZE);
 		memcpy(backupSrc, code->tic->cart.code.data, TIC_CODE_SIZE);
 
-		char* newSrc = replaceLines(&serverLines, &lines, startLine, endLine);
-		snprintf(code->tic->cart.code.data, TIC_CODE_SIZE, "%s", newSrc);
+		char* newSrc = (char*)malloc(TIC_CODE_SIZE);
+		s32 offset = 0;
+
+		for(s32 e = 0; e < code->collab.editCount; e++)
+		{
+			Edit* edit = &code->collab.edits[e];
+			if(edit->kind == EDIT_SAME)
+				addLine(newSrc, &offset, &lines, edit->line);
+			else if(edit->kind == EDIT_INSERT)
+			{
+				if(edit->line >= startLine && edit->line <= endLine)
+					addLine(newSrc, &offset, &lines, edit->line);
+			} 
+			else if (edit->kind == EDIT_DELETE)
+			{
+				if(edit->line < startLine || edit->line > endLine)
+					addLine(newSrc, &offset, &serverLines, edit->sourceLine);
+			}
+		}
+
+		newSrc[MIN(offset, TIC_CODE_SIZE - 1)] = '\0';
+		memcpy(code->src, newSrc, offset);
 		free(newSrc);
 
 		collab_put(code->collab.collab, code->tic);
@@ -754,8 +765,28 @@ static void pullFromServer(Code* code)
 		s32 startLine = MIN(positionLine, selectionLine);
 		s32 endLine = MAX(positionLine, selectionLine);
 
-		char* newSrc = replaceLines(&lines, &serverLines, startLine, endLine);
-		snprintf(code->src, TIC_CODE_SIZE, "%s", newSrc);
+		char* newSrc = (char*)malloc(TIC_CODE_SIZE);
+		s32 offset = 0;
+
+		for(s32 e = 0; e < code->collab.editCount; e++)
+		{
+			Edit* edit = &code->collab.edits[e];
+			if(edit->kind == EDIT_SAME)
+				addLine(newSrc, &offset, &lines, edit->line);
+			else if(edit->kind == EDIT_INSERT)
+			{
+				if(edit->line < startLine || edit->line > endLine)
+					addLine(newSrc, &offset, &lines, edit->line);
+			} 
+			else if (edit->kind == EDIT_DELETE)
+			{
+				if(edit->line >= startLine && edit->line <= endLine)
+					addLine(newSrc, &offset, &serverLines, edit->sourceLine);
+			}
+		}
+
+		newSrc[MIN(offset, TIC_CODE_SIZE - 1)] = '\0';
+		memcpy(code->src, newSrc, offset);
 		free(newSrc);
 
 		code->cursor.position = code->src + lines.offsets[startLine];
@@ -784,7 +815,7 @@ bool linesEqual(Lines *a, s32 aLine, Lines *b, s32 bLine)
 	return strncmp(a->text + aOffset, b->text + bOffset, aLength) == 0;
 }
 
-void myersDiff(Lines *a, Lines *b, s32** edits, s32* editCount)
+void myersDiff(Lines *a, Lines *b, Edit** edits, s32* editCount)
 {
     s32 n = a->count;
     s32 m = b->count;
@@ -829,7 +860,7 @@ found:;
 
     free(v);
 
-    *edits = (s32*)malloc(max * sizeof(s32));
+    *edits = (Edit*)malloc(max * sizeof(Edit));
     s32 e = max;
 
     s32 x = n;
@@ -854,15 +885,15 @@ found:;
         {
             x--;
             y--;
-            (*edits)[--e] = EDIT_SAME | x;
+            (*edits)[--e] = (Edit){.kind = EDIT_SAME, .sourceLine = x, .line = y};
         }
 
         if(d > 0)
         {
             if(x == prev_x)
-                (*edits)[--e] = EDIT_INSERT | prev_y;
+                (*edits)[--e] = (Edit){.kind = EDIT_INSERT, .sourceLine = prev_x, .line = prev_y};
             else
-                (*edits)[--e] = EDIT_DELETE | prev_x;
+                (*edits)[--e] = (Edit){.kind = EDIT_DELETE, .sourceLine = prev_x, .line = prev_y};
         }
 
         x = prev_x;
@@ -877,7 +908,7 @@ found:;
 
     *editCount = max - e;
 
-    memmove(*edits, *edits + e, *editCount * sizeof(int));
+    memmove(*edits, *edits + e, *editCount * sizeof(Edit));
 }
 
 static void diff(Code *code)
@@ -889,35 +920,15 @@ static void diff(Code *code)
 		Lines lines = splitLines(code->tic->cart.code.data);
 		Lines serverLines = splitLines(code->tic->collab.code.data);
 
+		if(code->collab.edits)
+			free(code->collab.edits);
+
 		s32* edits;
 		s32 editCount;
-		myersDiff(&serverLines, &lines, &edits, &editCount);
+		myersDiff(&serverLines, &lines, &code->collab.edits, &code->collab.editCount);
 
 		free(lines.offsets);
 		free(serverLines.offsets);
-
-		if(code->collab.lines)
-			free(code->collab.lines);
-		
-		code->collab.lineCount = MAX(lines.count, serverLines.count);
-		code->collab.lines = malloc(code->collab.lineCount * sizeof(s32));
-
-		s32 line = 0;
-		for(s32 i = 0; i < editCount; i++)
-		{
-			if(line >= code->collab.lineCount) // Safety check
-				break;
-			s32 type = edits[i] & EDIT_MASK;
-			s32 offset = edits[i] & ~EDIT_MASK;
-			if(type == EDIT_INSERT)
-				code->collab.lines[line++] = STATE_NEW;
-			else if(type == EDIT_DELETE)
-				code->collab.lines[line] = STATE_CHANGED;
-			else
-				code->collab.lines[line++] = STATE_SAME;
-		}
-
-		free(edits);
 	}
 }
 
@@ -1830,8 +1841,8 @@ void initCode(Code* code, tic_mem* tic, tic_code* src)
 		.collab = 
 		{
 			.collab = collab_create(tic_tool_cart_offset(&tic->cart, tic->cart.code.data), 1, sizeof(tic_code)),
-			.lines = NULL,
-			.lineCount = 0,
+			.edits = NULL,
+			.editCount = 0,
 		},
 		.mode = TEXT_EDIT_MODE,
 		.jump = {.line = -1},
