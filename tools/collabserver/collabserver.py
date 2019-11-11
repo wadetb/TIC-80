@@ -122,6 +122,7 @@ class CollabRequestHandler(http.server.BaseHTTPRequestHandler):
                 elif 'watch' in query:
                     self.send_response(200)
                     self.send_header('Transfer-Encoding', 'chunked')
+                    self.send_header('X-Accel-Buffering', 'no')
                     self.end_headers()
 
                     prefix = '8\r\n'.encode()
