@@ -1269,7 +1269,7 @@ void onCollabChanges()
 {
 	{
 		Code* code = impl.editor[impl.bank.index.code].code;
-		code->diff(code);
+		code->collab.diffNeeded++;
 	}
 
 	{

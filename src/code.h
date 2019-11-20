@@ -78,6 +78,9 @@ struct Code
 		
 		Edit* edits;
 		s32 editCount;
+
+		s32 diffCounter;
+		s32 diffNeeded;
 	} collab;
 
 	enum
