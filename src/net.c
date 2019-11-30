@@ -54,7 +54,7 @@ struct Net
 
 typedef struct
 {
-    void* buffer;
+    u8* buffer;
     s32 size;
 } CurlData;
 
@@ -63,8 +63,8 @@ static size_t writeCallback(void *contents, size_t size, size_t nmemb, void *use
 	CurlData* data = (CurlData*)userp;
 
 	const size_t total = size * nmemb;
-	data->buffer = realloc(data->buffer, data->size + total);
-	memcpy((u8*)data->buffer + data->size, contents, total);
+	data->buffer = (u8*)realloc(data->buffer, data->size + total);
+	memcpy(data->buffer + data->size, contents, total);
 	data->size += total;
 
 	return total;
@@ -92,7 +92,7 @@ static size_t readCallback(void *contents, size_t size, size_t nmemb, void *user
 {
 	CurlData* data = (CurlData*)userp;
 
-	size_t total = MIN(size * nmemb, data->size);
+	size_t total = MIN(size * nmemb, (size_t)data->size);
 
 	memcpy((u8*)contents, data->buffer, total);
 
@@ -104,7 +104,7 @@ static size_t readCallback(void *contents, size_t size, size_t nmemb, void *user
 
 void netPutRequest(Net* net, const char *url, void *content, s32 size)
 {
-	CurlData data = {content, size};
+	CurlData data = {(u8*)content, size};
 
 	struct curl_slist *headers = NULL;
 
