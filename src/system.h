@@ -6,7 +6,7 @@
 #define TIC80_OFFSET_LEFT ((TIC80_FULLWIDTH-TIC80_WIDTH)/2)
 #define TIC80_OFFSET_TOP ((TIC80_FULLHEIGHT-TIC80_HEIGHT)/2)
 
-typedef bool(*url_stream_callback)(u8* buffer, s32 size, void* data);
+typedef void(*url_stream_callback)(u8* buffer, s32 size, void* data);
 
 typedef struct
 {

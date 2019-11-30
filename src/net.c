@@ -27,11 +27,29 @@
 #include <stdio.h>
 
 #include <curl/curl.h>
-#include <SDL.h>
 
 struct Net
 {
-	struct Curl_easy* curl;
+	struct
+	{
+		struct Curl_easy* curl;
+	} get;
+
+	struct
+	{
+		struct Curl_easy* curl;
+	} put;
+
+	struct
+	{
+		CURLM* multi;
+		struct Curl_easy* curl;
+		bool active;
+		char url[1024];
+		NetResponse callback;
+		void* data;
+		s32 retryCounter;
+	} stream;
 };
 
 typedef struct
@@ -56,12 +74,12 @@ void* netGetRequest(Net* net, const char* url, s32* size)
 {
 	CurlData data = {NULL, 0};
 
-	if(net->curl)
+	if(net->get.curl)
 	{
-		curl_easy_setopt(net->curl, CURLOPT_URL, url);
-		curl_easy_setopt(net->curl, CURLOPT_WRITEDATA, &data);
+		curl_easy_setopt(net->get.curl, CURLOPT_URL, url);
+		curl_easy_setopt(net->get.curl, CURLOPT_WRITEDATA, &data);
 
-		if(curl_easy_perform(net->curl) != CURLE_OK)
+		if(curl_easy_perform(net->get.curl) != CURLE_OK)
 			return NULL;
 	}
 
@@ -88,95 +106,93 @@ void netPutRequest(Net* net, const char *url, void *content, s32 size)
 {
 	CurlData data = {content, size};
 
-	struct Curl_easy* curl = curl_easy_init();
-
 	struct curl_slist *headers = NULL;
 
-	char contentLength[1024];
-	snprintf(contentLength, sizeof(contentLength), "Content-Length: %d", size);
-  	headers = curl_slist_append(headers, contentLength);
- 	headers = curl_slist_append(headers, "Expect:");
- 	headers = curl_slist_append(headers, "Transfer-Encoding:");
+	if(net->put.curl)
+	{
+		char contentLength[1024];
+		snprintf(contentLength, sizeof(contentLength), "Content-Length: %d", size);
+		headers = curl_slist_append(headers, contentLength);
+		headers = curl_slist_append(headers, "Expect:");
+		headers = curl_slist_append(headers, "Transfer-Encoding:");
 
-	curl_easy_setopt(curl, CURLOPT_PUT, 1);
-	curl_easy_setopt(curl, CURLOPT_URL, url);
-	curl_easy_setopt(curl, CURLOPT_HTTPHEADER, headers);
-	curl_easy_setopt(curl, CURLOPT_READFUNCTION, readCallback);
-	curl_easy_setopt(curl, CURLOPT_READDATA, &data);
-	curl_easy_setopt(curl, CURLOPT_INFILESIZE, size);
+		curl_easy_setopt(net->put.curl, CURLOPT_URL, url);
+		curl_easy_setopt(net->put.curl, CURLOPT_HTTPHEADER, headers);
+		curl_easy_setopt(net->put.curl, CURLOPT_READDATA, &data);
+		curl_easy_setopt(net->put.curl, CURLOPT_INFILESIZE, size);
 
-	curl_easy_perform(curl);
+		curl_easy_perform(net->put.curl);
 
-	curl_slist_free_all(headers);
-
-	curl_easy_cleanup(curl);
+		curl_slist_free_all(headers);
+	}
 }
 
-typedef struct
+static size_t streamCallback(char *ptr, size_t size, size_t nmemb, void *userdata)
 {
-	bool cancel;
-	char url[FILENAME_MAX];
-	NetResponse callback;
-	void* data;
-}NetStreamData;
-
-size_t streamCallback(char *ptr, size_t size, size_t nmemb, void *userdata)
-{
-	NetStreamData* stream = (NetStreamData*)userdata;
+	Net* net = (Net*)userdata;
 
 	size_t total = size * nmemb;
 	
-	if(stream->callback)
-	{
-		if(!stream->callback(ptr, total, stream->data))
-		{
-			stream->cancel = true;
-			return 0;
-		}
-	}
+	if(net->stream.callback)
+		net->stream.callback(ptr, total, net->stream.data);
 
 	return total;
 }
 
-int SDLCALL netStreamThread(void *data)
+static void netStartStream(Net* net)
 {
-	NetStreamData* stream = (NetStreamData*)data;
+	curl_easy_setopt(net->stream.curl, CURLOPT_URL, net->stream.url);
+	curl_easy_setopt(net->stream.curl, CURLOPT_WRITEDATA, net);
 
-	struct Curl_easy* curl = curl_easy_init();
+	curl_multi_add_handle(net->stream.multi, net->stream.curl);
+	net->stream.active = true;
+}
 
-	curl_easy_setopt(curl, CURLOPT_URL, stream->url);
-	curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, streamCallback);
-	curl_easy_setopt(curl, CURLOPT_WRITEDATA, stream);
-
-	while(!stream->cancel)
-	{
-		if(curl_easy_perform(curl) != CURLE_OK)
-			SDL_Delay(1000);
-	}
-
-	curl_easy_cleanup(curl);
-
-	free(stream);
+static void netStopStream(Net *net)
+{
+	curl_multi_remove_handle(net->stream.multi, net->stream.curl);
+	net->stream.active = false;
 }
 
 void netGetStream(Net* net, const char *url, NetResponse callback, void* data)
 {
-	NetStreamData* stream = (NetStreamData*)malloc(sizeof(NetStreamData));
+	if(net->stream.active)
+		netStopStream(net);
 
-	if(stream)
+	snprintf(net->stream.url, sizeof(net->stream.url), "%s", url);
+	net->stream.callback = callback;
+	net->stream.data = data;
+	net->stream.retryCounter = 0;
+
+	if(url[0] != '\0')
+		netStartStream(net);
+}
+
+void netTick(Net *net)
+{
+	int running;
+	curl_multi_perform(net->stream.multi, &running);
+
+	int pending;
+	CURLMsg *msg;
+	while((msg = curl_multi_info_read(net->stream.multi, &pending)))
 	{
-		*stream = (NetStreamData)
+		if(msg->easy_handle == net->stream.curl)
 		{
-			.cancel = false,
-			.callback = callback,
-			.data = data
-		};
+			// Occurs in the case of a dropped connection, e.g. server restart or network loss.
+			if(msg->msg == CURLMSG_DONE)
+			{
+				netStopStream(net);
+				net->stream.retryCounter = 300;
+			}
+		}
+	}
 
-		snprintf(stream->url, sizeof(stream->url), "%s", url);
-
-		SDL_Thread *thread = SDL_CreateThread(netStreamThread, "stream thread", stream);
-		if(thread)
-			SDL_DetachThread(thread);
+	if(!net->stream.active && net->stream.retryCounter > 0)
+	{
+		net->stream.retryCounter--;
+		if(net->stream.retryCounter == 0)
+			netStartStream(net);
 	}
 }
 
@@ -186,18 +202,55 @@ Net* createNet()
 
 	*net = (Net)
 	{
-		.curl = curl_easy_init()
+		.get =
+		{
+			.curl = curl_easy_init(),
+		},
+		.put = 
+		{
+			.curl = curl_easy_init(),
+		},
+		.stream = 
+		{
+			.multi = curl_multi_init(),
+			.curl = curl_easy_init(),
+			.active = false,
+			.callback = NULL,
+			.data = NULL,
+		},
 	};
 
-	curl_easy_setopt(net->curl, CURLOPT_WRITEFUNCTION, writeCallback);
+	curl_easy_setopt(net->get.curl, CURLOPT_WRITEFUNCTION, writeCallback);
+
+	curl_easy_setopt(net->put.curl, CURLOPT_PUT, 1);
+	curl_easy_setopt(net->put.curl, CURLOPT_READFUNCTION, readCallback);
+
+	curl_easy_setopt(net->stream.curl, CURLOPT_WRITEFUNCTION, streamCallback);
+
+	// Make the OS check for dropped connections automatically:
+	curl_easy_setopt(net->stream.curl, CURLOPT_TCP_KEEPALIVE, 1L);
+	curl_easy_setopt(net->stream.curl, CURLOPT_TCP_KEEPIDLE, 120L);
+	curl_easy_setopt(net->stream.curl, CURLOPT_TCP_KEEPINTVL, 60L);
 
 	return net;
 }
 
 void closeNet(Net* net)
 {
-	if(net->curl)
-		curl_easy_cleanup(net->curl);
+	if(net->get.curl)
+		curl_easy_cleanup(net->get.curl);
+
+	if(net->put.curl)
+		curl_easy_cleanup(net->put.curl);
+
+	if(net->stream.active)
+		netStopStream(net);
+
+	if(net->stream.curl)
+		curl_easy_cleanup(net->stream.curl);
+
+	if(net->stream.multi)
+		curl_multi_cleanup(net->stream.multi);
 
 	free(net);
 }

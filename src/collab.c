@@ -27,8 +27,6 @@ struct
 {
     tic_mem *tic;
 
-    s32 streamCounter;
-
 	u8* stream;
 	s32 streamPos;
 	s32 streamSize;
@@ -177,11 +175,8 @@ typedef struct
 	s32 size;
 } StreamChunk;
 
-static bool collab_streamCallback(u8* buffer, s32 size, void* data)
+static void collab_streamCallback(u8* buffer, s32 size, void* data)
 {
-	if(impl.streamCounter != (s32)(uintptr_t)data)
-		return false;
-
 	if(impl.streamPos + size > impl.streamSize)
 	{
 		impl.streamSize = impl.streamPos + size;
@@ -209,21 +204,18 @@ static bool collab_streamCallback(u8* buffer, s32 size, void* data)
 	}
 
     onCollabChanges();
-
-	return true;
 }
 
 void collab_startChangesStream(tic_mem *tic)
 {
     impl.tic = tic;
-	impl.streamCounter++;
 
 	char url[1024];
 	snprintf(url, sizeof(url), "%s/?watch=1", getCollabUrl());
-	getSystem()->getUrlStream(url, collab_streamCallback, (void*)(uintptr_t)impl.streamCounter);
+	getSystem()->getUrlStream(url, collab_streamCallback, NULL);
 }
 
 void collab_stopChangesStream()
 {
-	impl.streamCounter++;
+	getSystem()->getUrlStream("", NULL, NULL);
 }

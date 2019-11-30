@@ -25,6 +25,7 @@
 import argparse
 import pathlib
 import re
+import socket
 import struct
 import time
 import threading
@@ -56,6 +57,7 @@ class TIC:
         else:
             self.init_needed = False
 
+        # No buffering, as multiple clients will access the same file simultaneously.
         self.file = self.path.open('r+b', buffering=0)
 
         self.condition = threading.Condition()
@@ -124,6 +126,9 @@ class CollabRequestHandler(http.server.BaseHTTPRequestHandler):
                     self.send_header('Transfer-Encoding', 'chunked')
                     self.send_header('X-Accel-Buffering', 'no')
                     self.end_headers()
+
+                    # Long-lived connection, ensure routers don't drop it.
+                    self.connection.setsockopt(socket.SOL_SOCKET, socket.SO_KEEPALIVE, 1)
 
                     prefix = '8\r\n'.encode()
                     suffix = '\r\n'.encode()

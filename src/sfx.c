@@ -584,7 +584,7 @@ static void drawCanvas(Sfx* sfx, s32 x, s32 y)
 		if(loop->start > 0 || loop->size > 0)
 		{
 			for(s32 i = 0; i < loop->size; i++)
-				sfx->tic->api.rect(sfx->tic, x + (loop->start+i) * CANVAS_SIZE+1, y + CANVAS_HEIGHT - 2, CANVAS_SIZE-1, 2, (tic_color_yellow)); // $$$
+				sfx->tic->api.rect(sfx->tic, x + (loop->start+i) * CANVAS_SIZE+1, y + CANVAS_HEIGHT - 2, CANVAS_SIZE-1, 2, (tic_color_white));
 		}
 	}
 }

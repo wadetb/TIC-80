@@ -152,7 +152,6 @@ static struct
 #if defined(TIC_BUILD_WITH_COLLAB)
 	struct
 	{
-		s32 counter;
 		bool enabled;
 		bool showDiffs;
 		char url[FILENAME_MAX];
@@ -1817,12 +1816,6 @@ static void renderStudio()
 	}
 
 	drawPopup();
-
-#if defined(TIC_BUILD_WITH_COLLAB) // $$$
-	impl.collab.counter -= 3;
-	if(impl.collab.counter < 0)
-		impl.collab.counter = 600;
-#endif
 
 	if(getConfig()->noSound)
 		memset(tic->ram.registers, 0, sizeof tic->ram.registers);

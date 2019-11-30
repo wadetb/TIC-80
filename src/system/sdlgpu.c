@@ -1347,6 +1347,8 @@ static void gpuTick()
 
 	pollEvent();
 
+	netTick(platform.net);
+
 	if(platform.studio->quit)
 	{
 #if defined __EMSCRIPTEN__

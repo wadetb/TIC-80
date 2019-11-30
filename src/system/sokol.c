@@ -193,6 +193,8 @@ static void app_frame(void)
 
 	if(platform.studio->quit) exit(0);
 
+	netTick(platform.net);
+
 	tic80_input* input = &tic->ram.input;
 
 	input->gamepads.data = 0;
