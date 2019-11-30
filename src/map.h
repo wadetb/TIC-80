@@ -24,9 +24,11 @@
 
 #include "studio.h"
 
-typedef struct Collab Collab;
-
 typedef struct Map Map;
+
+#if defined(TIC_BUILD_WITH_COLLAB)
+typedef struct Collab Collab;
+#endif
 
 struct Map
 {
@@ -81,11 +83,15 @@ struct Map
 	u8* paste;
 
 	struct History* history;
+#if defined(TIC_BUILD_WITH_COLLAB)
 	struct Collab* collab;
+#endif
 
 	void (*tick)(Map*);
 	void (*event)(Map*, StudioEvent);
+#if defined(TIC_BUILD_WITH_COLLAB)
 	void (*diff)(Map*);
+#endif
 	void (*scanline)(tic_mem* tic, s32 row, void* data);
 	void (*overline)(tic_mem* tic, void* data);
 };

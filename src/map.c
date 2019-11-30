@@ -875,6 +875,7 @@ static void drawMapOvr(Map* map)
 	tic->api.map(tic, map->src, getBankTiles(), map->scroll.x / TIC_SPRITESIZE, map->scroll.y / TIC_SPRITESIZE, 
 		TIC_MAP_SCREEN_WIDTH + 1, TIC_MAP_SCREEN_HEIGHT + 1, -scrollX, -scrollY, -1, 1);
 
+#if defined(TIC_BUILD_WITH_COLLAB)
 	if(collabShowDiffs())
 	{
 		for(s32 y = 0; y < TIC_MAP_HEIGHT; y += TIC_SPRITESIZE)
@@ -905,6 +906,7 @@ static void drawMapOvr(Map* map)
 			}
 		}
 	}
+#endif
 
 	if(map->canvas.grid || map->scroll.active)
 		drawGrid(map);
@@ -1041,6 +1043,8 @@ static void copyFromClipboard(Map* map)
 	}
 }
 
+#if defined(TIC_BUILD_WITH_COLLAB)
+
 static void clampSelectionRect(tic_rect* rect)
 {
 	if(rect->x < 0) rect->x = 0;
@@ -1094,6 +1098,8 @@ static void onDiff(Map *map)
 	collab_diff(map->collab, map->tic);
 }
 
+#endif
+
 static void processKeyboard(Map* map)
 {
 	tic_mem* tic = map->tic;
@@ -1110,12 +1116,14 @@ static void processKeyboard(Map* map)
 	default: break;
 	}
 	
+#if defined(TIC_BUILD_WITH_COLLAB)
 	switch(getCollabEvent())
 	{
 	case TIC_COLLAB_PULL: pullFromServer(map); break;
 	case TIC_COLLAB_PUSH: pushToServer(map); break;
 	default: break;
 	}
+#endif
 
 	if(ctrl)
 	{
@@ -1161,8 +1169,10 @@ static void tick(Map* map)
 	drawMapToolbar(map, TIC80_WIDTH - 9*TIC_FONT_WIDTH, 1);
 	drawToolbar(map->tic, TIC_COLOR_BG, false);
 
+#if defined(TIC_BUILD_WITH_COLLAB)
 	if(collabEnabled())
 		onDiff(map);
+#endif
 }
 
 static void onStudioEvent(Map* map, StudioEvent event)
@@ -1174,8 +1184,10 @@ static void onStudioEvent(Map* map, StudioEvent event)
 	case TIC_TOOLBAR_PASTE: copyFromClipboard(map); break;
 	case TIC_TOOLBAR_UNDO: undo(map); break;
 	case TIC_TOOLBAR_REDO: redo(map); break;
+#if defined(TIC_BUILD_WITH_COLLAB)
 	case TIC_TOOLBAR_PUSH: pushToServer(map); break;
 	case TIC_TOOLBAR_PULL: pullFromServer(map); break;
+#endif
 	default: break;
 	}
 }
@@ -1199,7 +1211,9 @@ static void overline(tic_mem* tic, void* data)
 void initMap(Map* map, tic_mem* tic, s32 bank)
 {
 	if(map->history) history_delete(map->history);
+#if defined(TIC_BUILD_WITH_COLLAB)
 	if(map->collab) collab_delete(map->collab);
+#endif
 	
 	*map = (Map)
 	{
@@ -1237,9 +1251,13 @@ void initMap(Map* map, tic_mem* tic, s32 bank)
 			.start = {0, 0},
 		},
 		.history = history_create(&tic->cart.banks[bank].map, sizeof(tic_map)),
+#if defined(TIC_BUILD_WITH_COLLAB)
 		.collab = collab_create(tic_tool_cart_offset(&tic->cart, tic->cart.banks[bank].map.data), sizeof(u8), TIC_MAP_WIDTH * TIC_MAP_HEIGHT),
+#endif
 		.event = onStudioEvent,
+#if defined(TIC_BUILD_WITH_COLLAB)
 		.diff = onDiff,
+#endif
 		.overline = overline,
 		.scanline = scanline,
 	};

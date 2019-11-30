@@ -1067,6 +1067,7 @@ static void drawPaletteOvr(Sprite* sprite, s32 x, s32 y)
 		sprite->tic->api.rect_border(sprite->tic, offsetX - 2, offsetY - 2, PALETTE_CELL_SIZE + 3, PALETTE_CELL_SIZE + 3, (tic_color_white));
 	}
 
+#if defined(TIC_BUILD_WITH_COLLAB)
 	if(collabShowDiffs())
 	{
 		tic_rgb *mine = sprite->tic->cart.bank0.palette.colors;
@@ -1076,6 +1077,7 @@ static void drawPaletteOvr(Sprite* sprite, s32 x, s32 y)
 				if(memcmp(&mine[i], &server[i], sizeof(tic_rgb)))
 					drawDiffRect(sprite->tic, x + col * PALETTE_CELL_SIZE, y + row * PALETTE_CELL_SIZE, PALETTE_CELL_SIZE-1, PALETTE_CELL_SIZE-1);
 	}
+#endif
 
 	{
 		static const u8 Icon[] =
@@ -1152,6 +1154,7 @@ static void drawSheetOvr(Sprite* sprite, s32 x, s32 y)
 		for(s32 i = 0; i < rect.w; i += TIC_SPRITESIZE, index++)
 			sprite->tic->api.sprite(sprite->tic, sprite->src, index, x + i, y + j, NULL, 0);
 
+#if defined(TIC_BUILD_WITH_COLLAB)
 	if(collabShowDiffs())
 	{
 		for(s32 j = 0, index = (sprite->index - sprite->index % TIC_BANK_SPRITES); j < rect.h; j += TIC_SPRITESIZE)
@@ -1202,6 +1205,7 @@ static void drawSheetOvr(Sprite* sprite, s32 x, s32 y)
 			}
 		}
 	}
+#endif
 
 	{
 		s32 bx = getIndexPosX(sprite) + x - 1;
@@ -1527,6 +1531,8 @@ static void copyFromClipboard(Sprite* sprite)
 	}
 }
 
+#if defined(TIC_BUILD_WITH_COLLAB)
+
 static void pushToServer(Sprite* sprite)
 {
 	if(sprite->tic->api.key(sprite->tic, tic_key_shift))
@@ -1575,6 +1581,8 @@ static void onDiff(Sprite *sprite)
 	collab_diff(sprite->collab.flags, sprite->tic);
 	collab_diff(sprite->collab.palette, sprite->tic);
 }
+
+#endif
 
 static void upSprite(Sprite* sprite)
 {
@@ -1629,12 +1637,14 @@ static void processKeyboard(Sprite* sprite)
 	default: break;
 	}
 
+#if defined(TIC_BUILD_WITH_COLLAB)
 	switch(getCollabEvent())
 	{
 	case TIC_COLLAB_PULL: pullFromServer(sprite); break;
 	case TIC_COLLAB_PUSH: pushToServer(sprite); break;
 	default: break;
 	}
+#endif
 
 	bool ctrl = tic->api.key(tic, tic_key_ctrl);
 
@@ -1806,8 +1816,10 @@ static void tick(Sprite* sprite)
 	drawSpriteToolbar(sprite);
 	drawToolbar(sprite->tic, (tic_color_gray), false);
 
+#if defined(TIC_BUILD_WITH_COLLAB)
 	if(collabEnabled())
 		onDiff(sprite);
+#endif
 
 	sprite->tickCounter++;
 }
@@ -1821,8 +1833,10 @@ static void onStudioEvent(Sprite* sprite, StudioEvent event)
 	case TIC_TOOLBAR_PASTE: copyFromClipboard(sprite); break;
 	case TIC_TOOLBAR_UNDO: undo(sprite); break;
 	case TIC_TOOLBAR_REDO: redo(sprite); break;
+#if defined(TIC_BUILD_WITH_COLLAB)
 	case TIC_TOOLBAR_PUSH: pushToServer(sprite); break;
 	case TIC_TOOLBAR_PULL: pullFromServer(sprite); break;
+#endif
 	}
 }
 
@@ -1849,9 +1863,11 @@ void initSprite(Sprite* sprite, tic_mem* tic, s32 bank)
 	if(sprite->select.back == NULL) sprite->select.back = (u8*)malloc(CANVAS_SIZE*CANVAS_SIZE);
 	if(sprite->select.front == NULL) sprite->select.front = (u8*)malloc(CANVAS_SIZE*CANVAS_SIZE);
 	if(sprite->history) history_delete(sprite->history);
+#if defined(TIC_BUILD_WITH_COLLAB)
 	if(sprite->collab.tiles) collab_delete(sprite->collab.tiles);
 	if(sprite->collab.flags) collab_delete(sprite->collab.flags);
 	if(sprite->collab.palette) collab_delete(sprite->collab.palette);
+#endif
 	
 	*sprite = (Sprite)
 	{
@@ -1876,14 +1892,18 @@ void initSprite(Sprite* sprite, tic_mem* tic, s32 bank)
 		},
 		.mode = SPRITE_DRAW_MODE,
 		.history = history_create(&tic->cart.banks[bank].tiles, TIC_SPRITES * sizeof(tic_tile)),
+#if defined(TIC_BUILD_WITH_COLLAB)
 		.collab = 
 		{
 			.tiles = collab_create(tic_tool_cart_offset(&tic->cart, tic->cart.banks[bank].tiles.data), sizeof(tic_tile), TIC_SPRITES),
 			.flags = collab_create(tic_tool_cart_offset(&tic->cart, tic->cart.banks[bank].flags.data), sizeof(u8), TIC_SPRITES),
 			.palette = collab_create(tic_tool_cart_offset(&tic->cart, tic->cart.banks[bank].palette.data), sizeof(tic_rgb), TIC_PALETTE_SIZE),
 		},
+#endif
 		.event = onStudioEvent,
+#if defined(TIC_BUILD_WITH_COLLAB)
 		.diff = onDiff,
+#endif
 		.overline = overline,
 		.scanline = scanline,
 	};

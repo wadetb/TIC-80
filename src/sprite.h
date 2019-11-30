@@ -27,7 +27,9 @@
 typedef struct Sprite Sprite;
 
 typedef struct History History;
+#if defined(TIC_BUILD_WITH_COLLAB)
 typedef struct Collab Collab;
+#endif
 
 struct Sprite
 {
@@ -66,16 +68,20 @@ struct Sprite
 
 	struct History* history;
 
+#if defined(TIC_BUILD_WITH_COLLAB)
 	struct
 	{
 		struct Collab* tiles;
 		struct Collab* flags;
 		struct Collab* palette;
 	}collab;
+#endif
 	
 	void (*tick)(Sprite*);
 	void (*event)(Sprite*, StudioEvent);
+#if defined(TIC_BUILD_WITH_COLLAB)
 	void (*diff)(Sprite*);
+#endif
 	void (*scanline)(tic_mem* tic, s32 row, void* data);
 	void (*overline)(tic_mem* tic, void* data);
 };

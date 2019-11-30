@@ -40,6 +40,7 @@ struct OutlineItem
 #define OUTLINE_SIZE ((TIC80_HEIGHT - TOOLBAR_SIZE*2)/TIC_FONT_HEIGHT)
 #define OUTLINE_ITEMS_SIZE (OUTLINE_SIZE * sizeof(OutlineItem))
 
+#if defined(TIC_BUILD_WITH_COLLAB)
 #define EDIT_INSERT 0
 #define EDIT_DELETE 1
 #define EDIT_SAME   2
@@ -53,6 +54,7 @@ struct Edit
 };
 
 static void diff(Code *code);
+#endif
 
 static void history(Code* code)
 {
@@ -129,6 +131,7 @@ static void drawCode(Code* code, bool withCursor)
 		colorPointer++;
 	}
 
+#if defined(TIC_BUILD_WITH_COLLAB)
 	if(collabShowDiffs())
 	{
 		for(s32 i = 0; i < code->collab.editCount; i++)
@@ -155,6 +158,7 @@ static void drawCode(Code* code, bool withCursor)
 			}
 		}
 	}
+#endif
 
 	if(code->cursor.position == pointer)
 		cursor.x = x, cursor.y = y;
@@ -483,7 +487,9 @@ static bool replaceSelection(Code* code)
 		code->cursor.selection = NULL;
 
 		history(code);
+#if defined(TIC_BUILD_WITH_COLLAB)
 		diff(code);
+#endif
 		parseSyntaxColor(code);
 
 		return true;
@@ -499,7 +505,9 @@ static void deleteChar(Code* code)
 		char* pos = code->cursor.position;
 		memmove(pos, pos + 1, strlen(pos));
 		history(code);
+#if defined(TIC_BUILD_WITH_COLLAB)
 		diff(code);
+#endif
 		parseSyntaxColor(code);
 	}
 }
@@ -511,7 +519,9 @@ static void backspaceChar(Code* code)
 		char* pos = --code->cursor.position;
 		memmove(pos, pos + 1, strlen(pos));
 		history(code);
+#if defined(TIC_BUILD_WITH_COLLAB)
 		diff(code);
+#endif
 		parseSyntaxColor(code);
 	}
 }
@@ -528,7 +538,9 @@ static void inputSymbolBase(Code* code, char sym)
 	*code->cursor.position++ = sym;
 
 	history(code);
+#if defined(TIC_BUILD_WITH_COLLAB)
 	diff(code);
+#endif
 
 	updateColumn(code);
 
@@ -602,7 +614,9 @@ static void cutToClipboard(Code* code)
 	copyToClipboard(code);
 	replaceSelection(code);
 	history(code);
+#if defined(TIC_BUILD_WITH_COLLAB)
 	diff(code);
+#endif
 }
 
 static void copyFromClipboard(Code* code)
@@ -639,7 +653,9 @@ static void copyFromClipboard(Code* code)
 				code->cursor.position += size;
 
 				history(code);
+#if defined(TIC_BUILD_WITH_COLLAB)
 				diff(code);
+#endif
 				parseSyntaxColor(code);
 			}
 
@@ -647,6 +663,8 @@ static void copyFromClipboard(Code* code)
 		}
 	}
 }
+
+#if defined(TIC_BUILD_WITH_COLLAB)
 
 typedef struct
 {
@@ -1070,8 +1088,8 @@ static void wordToLineEdits(Text *fromLines, Text *toLines, Edit *wordEdits, s32
 				toLineCount++;
 			}
 			
-			const char* kinds[] = {"insert", "delete", "same", "change"};
-			printf("%02d %02d | %s\n", lineEdit->from, lineEdit->to, kinds[lineEdit->kind]);
+			// const char* kinds[] = {"insert", "delete", "same", "change"};
+			// printf("%02d %02d | %s\n", lineEdit->from, lineEdit->to, kinds[lineEdit->kind]);
 
 			lineContents = 0;
 		}
@@ -1112,10 +1130,14 @@ static void diff(Code *code)
 	}
 }
 
+#endif
+
 static void update(Code* code)
 {
 	updateEditor(code);
+#if defined(TIC_BUILD_WITH_COLLAB)
 	diff(code);
+#endif
 	parseSyntaxColor(code);
 }
 
@@ -1192,7 +1214,9 @@ static void doTab(Code* code, bool shift, bool crtl)
 			else if (start <= end) code->cursor.position = end;
 			
 			history(code);
+#if defined(TIC_BUILD_WITH_COLLAB)
 			diff(code);
+#endif
 			parseSyntaxColor(code);
 		}
 	}
@@ -1395,7 +1419,9 @@ static void commentLine(Code* code)
 	code->cursor.selection = NULL;	
 
 	history(code);
+#if defined(TIC_BUILD_WITH_COLLAB)
 	diff(code);
+#endif
 	parseSyntaxColor(code);
 }
 
@@ -1413,12 +1439,14 @@ static void processKeyboard(Code* code)
 	default: break;
 	}
 
+#if defined(TIC_BUILD_WITH_COLLAB)
 	switch(getCollabEvent())
 	{
 	case TIC_COLLAB_PULL: pullFromServer(code); break;
 	case TIC_COLLAB_PUSH: pushToServer(code); break;
 	default: break;
 	}
+#endif
 
 	bool shift = tic->api.key(tic, tic_key_shift);
 	bool ctrl = tic->api.key(tic, tic_key_ctrl);
@@ -1965,11 +1993,13 @@ static void tick(Code* code)
 
 	drawCodeToolbar(code);
 
+#if defined(TIC_BUILD_WITH_COLLAB)
 	if(code->collab.diffNeeded != code->collab.diffCounter)
 	{
 		code->collab.diffNeeded = code->collab.diffCounter;
 		code->diff(code);
 	}
+#endif
 
 	code->tickCounter++;
 }
@@ -1997,8 +2027,10 @@ static void onStudioEvent(Code* code, StudioEvent event)
 	case TIC_TOOLBAR_PASTE: copyFromClipboard(code); break;
 	case TIC_TOOLBAR_UNDO: undo(code); break;
 	case TIC_TOOLBAR_REDO: redo(code); break;
+#if defined(TIC_BUILD_WITH_COLLAB)
 	case TIC_TOOLBAR_PUSH: pushToServer(code); break;
 	case TIC_TOOLBAR_PULL: pullFromServer(code); break;
+#endif
 	}
 }
 
@@ -2010,7 +2042,9 @@ void initCode(Code* code, tic_mem* tic, tic_code* src)
 	if(code->history) history_delete(code->history);
 	if(code->cursorHistory) history_delete(code->cursorHistory);
 
+#if defined(TIC_BUILD_WITH_COLLAB)
 	if (code->collab.collab) collab_delete(code->collab.collab);
+#endif
 
 	*code = (Code)
 	{
@@ -2024,12 +2058,14 @@ void initCode(Code* code, tic_mem* tic, tic_code* src)
 		.tickCounter = 0,
 		.history = NULL,
 		.cursorHistory = NULL,
+#if defined(TIC_BUILD_WITH_COLLAB)
 		.collab = 
 		{
 			.collab = collab_create(tic_tool_cart_offset(&tic->cart, tic->cart.code.data), 1, sizeof(tic_code)),
 			.edits = NULL,
 			.editCount = 0,
 		},
+#endif
 		.mode = TEXT_EDIT_MODE,
 		.jump = {.line = -1},
 		.popup =
@@ -2044,7 +2080,9 @@ void initCode(Code* code, tic_mem* tic, tic_code* src)
 		},
 		.altFont = getConfig()->theme.code.altFont,
 		.event = onStudioEvent,
+#if defined(TIC_BUILD_WITH_COLLAB)
 		.diff = diff,
+#endif
 		.update = update,
 	};
 

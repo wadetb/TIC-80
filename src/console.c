@@ -1503,6 +1503,8 @@ static void onConsoleSurfCommand(Console* console, const char* param)
 	commandDone(console);
 }
 
+#if defined(TIC_BUILD_WITH_COLLAB)
+
 static void onConsoleCollabCommand(Console* console, const char* param)
 {
 	if(param && strlen(param))
@@ -1537,6 +1539,8 @@ static void onConsoleCollabCommand(Console* console, const char* param)
 
 	commandDone(console);
 }
+
+#endif
 
 static void onConsoleCodeCommand(Console* console, const char* param)
 {
@@ -2444,7 +2448,9 @@ static const struct
 	{"version",	NULL, "show the current version",	onConsoleVersionCommand},
 	{"edit",	NULL, "open cart editor",			onConsoleCodeCommand},
 	{"surf",	NULL, "open carts browser",			onConsoleSurfCommand},
+#if defined(TIC_BUILD_WITH_COLLAB)
 	{"collab",	NULL, "connect to collab server",	onConsoleCollabCommand},
+#endif
 };
 
 static bool predictFilename(const char* name, const char* info, s32 id, void* data, bool dir)

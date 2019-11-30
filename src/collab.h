@@ -22,6 +22,14 @@
 
 #pragma once
 
+#if defined(TIC_BUILD_WITH_COLLAB)
+#define IF_COLLAB( ... ) __VA_ARGS__
+#else
+#define IF_COLLAB( ... )
+#endif
+
+#if defined(TIC_BUILD_WITH_COLLAB)
+
 #include <tic80_types.h>
 
 typedef struct tic_mem tic_mem;
@@ -42,3 +50,5 @@ void collab_getRange(Collab* collab, tic_mem* tic, s32 first, s32 count);
 void collab_putInitialData(tic_mem *tic);
 void collab_startChangesStream(tic_mem *tic);
 void collab_stopChangesStream();
+
+#endif
