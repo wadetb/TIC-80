@@ -37,6 +37,7 @@ static void onError(void* data, const char* info)
 {
 	Run* run = (Run*)data;
 
+	tic_tool_debug_log("setStudioMode to TIC_CONSOLE_MODE by onError");
 	setStudioMode(TIC_CONSOLE_MODE);
 	run->console->error(run->console, info);
 }
@@ -101,7 +102,10 @@ static void tick(Run* run)
 	}
 
 	if(run->exit)
+	{
+		tic_tool_debug_log("setStudioMode to TIC_CONSOLE_MODE by run->exit");
 		setStudioMode(TIC_CONSOLE_MODE);
+	}
 }
 
 static void processDoFile(void* data, char* dst)

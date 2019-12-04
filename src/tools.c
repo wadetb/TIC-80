@@ -24,6 +24,9 @@
 #include "ext/gif.h"
 
 #include <string.h>
+#include <stdarg.h>
+#include <stdio.h>
+#include <time.h>
 
 extern void tic_tool_poke4(void* addr, u32 index, u8 value);
 extern u8 tic_tool_peek4(const void* addr, u32 index);
@@ -109,4 +112,27 @@ u32* tic_palette_blit(const tic_palette* srcpal)
 bool tic_tool_has_ext(const char* name, const char* ext)
 {
 	return strcmp(name + strlen(name) - strlen(ext), ext) == 0;
+}
+
+void tic_tool_debug_log(const char* fmt, ...)
+{
+	FILE* logfile = fopen("tic80_debug.txt", "a");
+
+	if(logfile)
+	{
+		char dt[20];
+		time_t current_time = time(NULL);
+		struct tm tm = *localtime(&current_time);
+		strftime(dt, sizeof(dt), "%d/%m/%Y %H:%M:%S", &tm);
+		fprintf(logfile, "%s: ", dt);
+
+		va_list args;
+		va_start(args, fmt);
+		vfprintf(logfile, fmt, args);
+		va_end(args);
+
+		fprintf(logfile, "\n");
+
+		fclose(logfile);
+	}
 }

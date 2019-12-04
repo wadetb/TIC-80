@@ -746,7 +746,10 @@ void drawToolbar(tic_mem* tic, u8 color, bool bg)
 			showTooltip(Tips[i]);
 
 			if(checkMouseClick(&rect, tic_mouse_left))
+			{
+				tic_tool_debug_log("setStudioMode by left click on toolbar button");
 				setStudioMode(Modes[i]);
+			}
 		}
 
 		if(getStudioMode() == Modes[i]) mode = i;
@@ -906,11 +909,13 @@ static void initSurfMode()
 void gotoSurf()
 {
 	initSurfMode();
+	tic_tool_debug_log("setStudioMode TIC_SURF_MODE by gotoSurf");
 	setStudioMode(TIC_SURF_MODE);
 }
 
 void gotoCode()
 {
+	tic_tool_debug_log("setStudioMode TIC_CODE_MODE by gotoCode");
 	setStudioMode(TIC_CODE_MODE);
 }
 
@@ -922,6 +927,7 @@ static void initMenuMode()
 void runGameFromSurf()
 {
 	impl.studio.tic->api.reset(impl.studio.tic);
+	tic_tool_debug_log("setStudioMode TIC_RUN_MODE by runGameFromSurf");
 	setStudioMode(TIC_RUN_MODE);
 	impl.prevMode = TIC_SURF_MODE;
 }
@@ -930,10 +936,12 @@ void exitFromGameMenu()
 {
 	if(impl.prevMode == TIC_SURF_MODE)
 	{
+		tic_tool_debug_log("setStudioMode TIC_SURF_MODE by exitFromGameMenu");
 		setStudioMode(TIC_SURF_MODE);
 	}
 	else
 	{
+		tic_tool_debug_log("setStudioMode TIC_CONSOLE_MODE by exitFromGameMenu");
 		setStudioMode(TIC_CONSOLE_MODE);
 	}
 
@@ -947,6 +955,8 @@ void resumeRunMode()
 
 void setStudioMode(EditorMode mode)
 {
+	tic_tool_debug_log("setStudioMode %d", mode);
+
 	if(mode != impl.mode)
 	{
 		EditorMode prev = impl.mode;
@@ -995,6 +1005,7 @@ void changeStudioMode(s32 dir)
 	{
 		if(impl.mode == Modes[i])
 		{
+			tic_tool_debug_log("setStudioMode by changeStudioMode direction %d", dir);
 			setStudioMode(Modes[(i+dir+modeCount) % modeCount]);
 			return;
 		}
@@ -1078,7 +1089,11 @@ void hideDialog()
 		impl.studio.tic->api.resume(impl.studio.tic);
 		impl.mode = TIC_RUN_MODE;
 	}
-	else setStudioMode(impl.dialogMode);
+	else 
+	{
+		tic_tool_debug_log("setStudioMode by hideDialog");
+		setStudioMode(impl.dialogMode);
+	}
 }
 
 void showDialog(const char** text, s32 rows, DialogCallback callback, void* data)
@@ -1087,6 +1102,7 @@ void showDialog(const char** text, s32 rows, DialogCallback callback, void* data
 	{
 		initDialog(impl.dialog, impl.studio.tic, text, rows, callback, data);
 		impl.dialogMode = impl.mode;
+		tic_tool_debug_log("setStudioMode TIC_DIALOG_MODE by showDialog");
 		setStudioMode(TIC_DIALOG_MODE);
 	}
 }
@@ -1190,7 +1206,11 @@ void runProject()
 	{
 		initRunMode();
 	}
-	else setStudioMode(TIC_RUN_MODE);
+	else 
+	{
+		tic_tool_debug_log("setStudioMode TIC_RUN_MODE by runProject");
+		setStudioMode(TIC_RUN_MODE);
+	}
 }
 
 static void saveProject()
@@ -1362,7 +1382,11 @@ static void processShortcuts()
 
 	if(alt)
 	{
-		if(keyWasPressedOnce(tic_key_grave)) setStudioMode(TIC_CONSOLE_MODE);
+		if(keyWasPressedOnce(tic_key_grave))
+		{
+			tic_tool_debug_log("setStudioMode TIC_CONSOLE_MODE by alt+grave");
+			setStudioMode(TIC_CONSOLE_MODE);
+		}
 		else if(keyWasPressedOnce(tic_key_1)) setStudioMode(TIC_CODE_MODE);
 		else if(keyWasPressedOnce(tic_key_2)) setStudioMode(TIC_SPRITE_MODE);
 		else if(keyWasPressedOnce(tic_key_3)) setStudioMode(TIC_MAP_MODE);
@@ -1408,6 +1432,7 @@ static void processShortcuts()
 				return;
 			}
 
+			tic_tool_debug_log("setStudioMode to previous mode by escape key");
 			setStudioMode(impl.mode == TIC_CONSOLE_MODE ? impl.prevMode : TIC_CONSOLE_MODE);
 		}
 	}
@@ -1872,6 +1897,7 @@ Studio* studioInit(s32 argc, char **argv, s32 samplerate, const char* folder, Sy
 
 	if(impl.console->skipStart)
 	{
+		tic_tool_debug_log("setStudioMode to TIC_CONSOLE_MODE at startup");
 		setStudioMode(TIC_CONSOLE_MODE);
 	}
 

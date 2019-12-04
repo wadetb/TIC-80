@@ -730,7 +730,7 @@ static void processGamepad()
 
 static void processTouchInput()
 {
-	#if !defined(__EMSCRIPTEN__) && !defined(__MACOSX__)
+#if !defined(__EMSCRIPTEN__) && !defined(__MACOSX__)
 	{
 		s32 devices = SDL_GetNumTouchDevices();
 		for (s32 i = 0; i < devices; i++)
@@ -754,10 +754,13 @@ static void handleKeydown(SDL_Keycode keycode, bool down)
 		#include "keycodes.inl"
 	};
 
+	tic_tool_debug_log("SDL: key %d is %d", keycode, down);
+
 	for(tic_key i = 0; i < COUNT_OF(KeyboardCodes); i++)
 	{
 		if(KeyboardCodes[i] == keycode)
 		{
+			tic_tool_debug_log("   that translates to TIC key %d which is now %d", i, down);
 			platform.keyboard.state[i] = down;
 			break;
 		}
@@ -1431,6 +1434,8 @@ static s32 start(s32 argc, char **argv, const char* folder)
 	SDL_SetHint(SDL_HINT_ACCELEROMETER_AS_JOYSTICK, "0");
 
 	SDL_Init(SDL_INIT_VIDEO | SDL_INIT_AUDIO | SDL_INIT_JOYSTICK);
+
+	tic_tool_debug_log("TIC-80 starting up...");
 
 	initSound();
 

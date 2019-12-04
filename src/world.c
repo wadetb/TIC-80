@@ -54,7 +54,10 @@ static void drawGrid(World* world)
 		}
 
 		if(checkMouseClick(&rect, tic_mouse_left))
+		{
+			tic_tool_debug_log("setStudioMode to TIC_MAP_MODE by mouse");
 			setStudioMode(TIC_MAP_MODE);
+		}
 	}
 
 	world->tic->api.rect_border(world->tic, map->scroll.x / TIC_SPRITESIZE, map->scroll.y / TIC_SPRITESIZE, 

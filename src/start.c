@@ -65,6 +65,7 @@ static void end(Start* start)
 
 	drawHeader(start);
 
+	tic_tool_debug_log("setStudioMode to TIC_CONSOLE_MODE by end, whatever that is");
 	setStudioMode(TIC_CONSOLE_MODE);
 }
 
