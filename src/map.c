@@ -1144,5 +1144,7 @@ void initMap(Map* map, tic_mem* tic, tic_map* src)
 		.scanline = scanline,
 	};
 
+	history_add(map->history);
+
 	normalizeMap(&map->scroll.x, &map->scroll.y);
 }

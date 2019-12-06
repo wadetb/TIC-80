@@ -1685,5 +1685,7 @@ void initMusic(Music* music, tic_mem* tic, tic_music* src)
 		.event = onStudioEvent,
 	};
 
+	history_add(music->history);
+
 	resetSelection(music);
 }

@@ -1753,4 +1753,6 @@ void initSprite(Sprite* sprite, tic_mem* tic, tic_tiles* src)
 		.overline = overline,
 		.scanline = scanline,
 	};
+
+	history_add(sprite->history);
 }

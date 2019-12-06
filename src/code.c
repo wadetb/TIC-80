@@ -608,14 +608,14 @@ static void update(Code* code)
 
 static void undo(Code* code)
 {
-	history_undo_to_kind(code->cursorHistory, HISTORY_KIND_BEFORE);
+	history_undo(code->cursorHistory);
 	history_undo(code->history);
 	update(code);
 }
 
 static void redo(Code* code)
 {
-	history_redo_to_kind(code->cursorHistory, HISTORY_KIND_AFTER);
+	history_redo(code->cursorHistory);
 	history_redo(code->history);
 	update(code);
 }
@@ -1057,9 +1057,9 @@ static void textEditTick(Code* code)
 	{
 		Cursor afterCursor = code->cursor;
 		code->cursor = beforeCursor;
-		history_add_with_kind(code->cursorHistory, HISTORY_KIND_BEFORE);
+		history_add(code->cursorHistory);
 		code->cursor = afterCursor;
-		history_add_with_kind(code->cursorHistory, HISTORY_KIND_AFTER);
+		history_add_transient(code->cursorHistory);
 
 		history_add(code->history);
 
@@ -1528,5 +1528,7 @@ void initCode(Code* code, tic_mem* tic, tic_code* src)
 	code->history = history_create(code->src, sizeof(tic_code));
 	code->cursorHistory = history_create(&code->cursor, sizeof code->cursor);
 
+	history_add(code->history);
+	
 	update(code);
 }

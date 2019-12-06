@@ -1063,4 +1063,6 @@ void initSfx(Sfx* sfx, tic_mem* tic, tic_sfx* src)
 		.history = history_create(src, sizeof(tic_sfx)),
 		.event = onStudioEvent,
 	};
+
+	history_add(sfx->history);
 }
