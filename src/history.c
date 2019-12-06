@@ -40,7 +40,7 @@ struct Item
 	Item* next;
 	Item* prev;
 
-	bool transient;
+	bool skip;
 	Data data;
 };
 
@@ -59,12 +59,12 @@ static void list_delete(Item* list, Item* from)
 	}
 }
 
-static Item* list_insert(Item* list, bool transient, Data* data)
+static Item* list_insert(Item* list, bool skip, Data* data)
 {
 	Item* item = (Item*)malloc(sizeof(Item));
 	item->next = NULL;
 	item->prev = NULL;
-	item->transient = transient;
+	item->skip = skip;
 	item->data = *data;
 
 	if(list)
@@ -104,6 +104,9 @@ History* history_create(void* data, u32 size)
 	history->list = NULL;
 	history->size = size;
 
+	history->state = (u8*)malloc(size);
+	memcpy(history->state, data, size);
+
 	return history;
 }
 
@@ -111,23 +114,41 @@ void history_delete(History* history)
 {
 	if(history)
 	{
+		free(history->state);
+
 		list_delete(history->list, list_first(history->list));
 
 		free(history);
 	}
 }
 
-static void history_apply(History* history, Data* data)
+static void history_diff(History* history, Data* data)
 {
 	for (u32 i = data->start, k = 0; i < data->end; ++i, ++k)
-		((u8*)history->data)[i] = data->buffer[k];
+		history->state[i] ^= data->buffer[k];
+}
+
+static u32 trim_left(u8* data, u32 size)
+{
+	for(u32 i = 0; i < size; i++)
+		if(data[i]) return i;
+
+	return size;
+}
+
+static u32 trim_right(u8* data, u32 size)
+{
+	for(u32 i = 0; i < size; i++)
+		if(data[size - i - 1]) return size - i;
+
+	return 0;
 }
 
 void history_print(History* history)
 {
 	printf("<<< HISTORY %p >>>>\n", history);
 
-	static const char* kinds[] = {"NORMAL", "TRANSIENT"};
+	static const char* kinds[] = {"NORMAL", "skip"};
 
 	Item* item = history->list;
 	for(; item && item->prev != NULL; item = item->prev)
@@ -135,42 +156,35 @@ void history_print(History* history)
 
 	int i = 0;
 	for(; item; item = item->next, i++)
-		printf("%d: %s %d-%d %s\n", i, item == history->list ? ">>>" : "", 
-			item->data.start, item->data.end, kinds[item->transient]);
+		printf("%d: %p %s %d-%d %s\n", i, item, item == history->list ? ">>>" : "", 
+			item->data.start, item->data.end, kinds[item->skip]);
 }
 
-static void history_add_internal(History* history, bool transient)
+static void history_add_internal(History* history, bool skip)
 {
 	printf("=== BEFORE ADD TO HISTORY %p ===\n", history);
 	history_print(history);
 
+	history_diff(history, &(Data){history->data, 0, history->size});
+
 	{
 		Data data;
+		data.start = trim_left(history->state, history->size);
+		data.end = trim_right(history->state, history->size);
 
-		data.start = 0;
-		data.end = history->size;
-		// for(data.start = 0; data.start < history->size; data.start++)
-		// 	if(history->state[data.start] != ((u8*)history->data)[data.start])
-		// 		break;
-		// for(data.end = history->size - 1; data.end > 0; data.end--)
-		// 	if(history->state[data.end] != ((u8*)history->data)[data.end])
-		// 		break;
-		// data.end++;
-
-		if(data.start < data.end)
+		if(data.end > data.start)
 		{
 			u32 size = data.end - data.start;
 			data.buffer = malloc(size);
 
-			memcpy(data.buffer, (u8*)history->data + data.start, size);
+			memcpy(data.buffer, (u8*)history->state + data.start, size);
 		}
-		else
-		{
-			data.buffer = NULL;
-		}
+		else data.buffer = NULL;
 
-		history->list = list_insert(history->list, transient, &data);
+		history->list = list_insert(history->list, skip, &data);
 	}
+
+	memcpy(history->state, history->data, history->size);
 
 	printf("=== AFTER ADD TO HISTORY %p ===\n", history);
 	history_print(history);
@@ -181,7 +195,7 @@ void history_add(History* history)
 	history_add_internal(history, false);
 }
 
-void history_add_transient(History* history)
+void history_add_skip(History* history)
 {
 	history_add_internal(history, true);
 }
@@ -194,7 +208,7 @@ void history_undo(History* history)
 	Item *target = NULL;
 
 	for(Item* iter = history->list->prev; iter; iter = iter->prev)
-		if(!iter->transient)
+		if(!iter->skip)
 		{
 			target = iter;
 			break;
@@ -202,13 +216,15 @@ void history_undo(History* history)
 
 	if(target)
 	{
-		history_apply(history, &history->list->data);
-		do
+		while (history->list != target)
 		{
+			printf("<<< APPLY %p >>>>\n", history->list);
+			history_diff(history, &history->list->data);
 			history->list = history->list->prev;
-			history_apply(history, &history->list->data);
-		} while (history->list != target);
+		}
 	}
+
+	memcpy(history->data, history->state, history->size);
 
 	printf("=== AFTER UNDO HISTORY %p ===\n", history);
 	history_print(history);
@@ -222,7 +238,7 @@ void history_redo(History* history)
 	Item *target = NULL;
 
 	for(Item* iter = history->list->next; iter; iter = iter->next)
-		if(!iter->transient)
+		if(!iter->skip)
 		{
 			target = iter;
 			break;
@@ -230,13 +246,15 @@ void history_redo(History* history)
 
 	if(target)
 	{
-		history_apply(history, &history->list->data);
 		do
 		{
 			history->list = history->list->next;
-			history_apply(history, &history->list->data);
+			printf("<<< APPLY %p >>>>\n", history->list);
+			history_diff(history, &history->list->data);
 		} while (history->list != target);
 	}
+
+	memcpy(history->data, history->state, history->size);
 
 	printf("=== AFTER REDO HISTORY %p ===\n", history);
 	history_print(history);

@@ -486,7 +486,6 @@ static void inputSymbolBase(Code* code, char sym)
 
 	*code->cursor.position++ = sym;
 	code->changed = true;
-
 }
 
 static void inputSymbol(Code* code, char sym)
@@ -608,15 +607,17 @@ static void update(Code* code)
 
 static void undo(Code* code)
 {
-	history_undo(code->cursorHistory);
 	history_undo(code->history);
+	history_undo(code->cursorHistory);
+
 	update(code);
 }
 
 static void redo(Code* code)
 {
-	history_redo(code->cursorHistory);
 	history_redo(code->history);
+	history_redo(code->cursorHistory);
+
 	update(code);
 }
 
@@ -660,6 +661,7 @@ static void doTab(Code* code, bool shift, bool crtl)
 				memmove(line + 1, line, strlen(line)+1);
 				*line = '\t';
 				end++;
+
 				changed = true;
 			}
 			
@@ -678,10 +680,7 @@ static void doTab(Code* code, bool shift, bool crtl)
 			code->changed = true;
 		}
 	}
-	else
-	{
-		inputSymbolBase(code, '\t');
-	} 
+	else inputSymbolBase(code, '\t');
 }
 
 static void setFindMode(Code* code)
@@ -880,7 +879,6 @@ static void commentLine(Code* code)
 	code->cursor.selection = NULL;
 
 	code->changed = true;
-	
 }
 
 static void processKeyboard(Code* code)
@@ -1057,9 +1055,9 @@ static void textEditTick(Code* code)
 	{
 		Cursor afterCursor = code->cursor;
 		code->cursor = beforeCursor;
-		history_add(code->cursorHistory);
+		history_add_skip(code->cursorHistory);
 		code->cursor = afterCursor;
-		history_add_transient(code->cursorHistory);
+		history_add(code->cursorHistory);
 
 		history_add(code->history);
 
@@ -1529,6 +1527,6 @@ void initCode(Code* code, tic_mem* tic, tic_code* src)
 	code->cursorHistory = history_create(&code->cursor, sizeof code->cursor);
 
 	history_add(code->history);
-	
+
 	update(code);
 }
