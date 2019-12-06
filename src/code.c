@@ -609,14 +609,14 @@ static void update(Code* code)
 static void undo(Code* code)
 {
 	history_undo_to_kind(code->cursorHistory, HISTORY_KIND_BEFORE);
-	history_undo_to_kind(code->history, HISTORY_KIND_BEFORE);
+	history_undo(code->history);
 	update(code);
 }
 
 static void redo(Code* code)
 {
 	history_redo_to_kind(code->cursorHistory, HISTORY_KIND_AFTER);
-	history_redo_to_kind(code->history, HISTORY_KIND_AFTER);
+	history_redo(code->history);
 	update(code);
 }
 
@@ -1024,8 +1024,6 @@ static void textEditTick(Code* code)
 {
 	tic_mem* tic = code->tic;
 
-	static char beforeCode[TIC_CODE_SIZE];
-	memcpy(beforeCode, code->src, TIC_CODE_SIZE);
 	Cursor beforeCursor = code->cursor;
 
 	// process scroll
@@ -1063,14 +1061,7 @@ static void textEditTick(Code* code)
 		code->cursor = afterCursor;
 		history_add_with_kind(code->cursorHistory, HISTORY_KIND_AFTER);
 
-		static char afterCode[TIC_CODE_SIZE];
-		memcpy(afterCode, code->src, TIC_CODE_SIZE);
-
-		memcpy(code->src, beforeCode, TIC_CODE_SIZE);
-		history_add_with_kind(code->history, HISTORY_KIND_BEFORE);
-
-		memcpy(code->src, afterCode, TIC_CODE_SIZE);
-		history_add_with_kind(code->history, HISTORY_KIND_AFTER);
+		history_add(code->history);
 
 		update(code);
 
