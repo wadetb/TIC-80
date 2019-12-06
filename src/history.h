@@ -25,9 +25,43 @@
 #include <tic80_types.h>
 
 typedef struct History History;
+typedef struct Item Item;
+
+typedef struct
+{
+	u8* buffer;
+	u32 start;
+	u32 end;
+} Data;
+
+typedef struct Item Item;
+
+struct Item
+{
+	Item* next;
+	Item* prev;
+
+    s32 kind;
+	Data data;
+};
+
+struct History
+{
+	Item* list;
+
+	void* data;
+	u32 size;
+};
+
+#define HISTORY_KIND_BEFORE 1
+#define HISTORY_KIND_AFTER 2
 
 History* history_create(void* data, u32 size);
-bool history_add(History* history);
+void history_add(History* history);
 void history_undo(History* history);
 void history_redo(History* history);
+void history_add_with_kind(History* history, s32 kind);
+void history_undo_to_kind(History* history, s32 kind);
+void history_redo_to_kind(History* history, s32 kind);
 void history_delete(History* history);
+

@@ -39,10 +39,16 @@ struct OutlineItem
 #define OUTLINE_SIZE ((TIC80_HEIGHT - TOOLBAR_SIZE*2)/TIC_FONT_HEIGHT)
 #define OUTLINE_ITEMS_SIZE (OUTLINE_SIZE * sizeof(OutlineItem))
 
-static void history(Code* code)
+static void preHistory(Code* code)
 {
-	if(history_add(code->history))
-		history_add(code->cursorHistory);
+	history_add(code->history);
+	history_add(code->cursorHistory);
+}
+
+static void postHistory(Code* code)
+{
+	history_add(code->history);
+	history_add(code->cursorHistory);
 }
 
 static void drawStatus(Code* code)
@@ -440,10 +446,7 @@ static bool replaceSelection(Code* code)
 		code->cursor.position = start;
 		code->cursor.selection = NULL;
 
-		history(code);
-
-		parseSyntaxColor(code);
-
+		code->changed = true;
 		return true;
 	}
 
@@ -456,8 +459,8 @@ static void deleteChar(Code* code)
 	{
 		char* pos = code->cursor.position;
 		memmove(pos, pos + 1, strlen(pos));
-		history(code);
-		parseSyntaxColor(code);
+		code->changed = true;
+
 	}
 }
 
@@ -467,8 +470,8 @@ static void backspaceChar(Code* code)
 	{
 		char* pos = --code->cursor.position;
 		memmove(pos, pos + 1, strlen(pos));
-		history(code);
-		parseSyntaxColor(code);
+		code->changed = true;
+
 	}
 }
 
@@ -482,12 +485,8 @@ static void inputSymbolBase(Code* code, char sym)
 	memmove(pos + 1, pos, strlen(pos)+1);
 
 	*code->cursor.position++ = sym;
+	code->changed = true;
 
-	history(code);
-
-	updateColumn(code);
-
-	parseSyntaxColor(code);
 }
 
 static void inputSymbol(Code* code, char sym)
@@ -509,17 +508,17 @@ static void newLine(Code* code)
 		if(ptr > code->cursor.position)
 			size -= ptr - code->cursor.position;
 
-		inputSymbol(code, '\n');
+		inputSymbolBase(code, '\n');
 
 		for(size_t i = 0; i < size; i++)
-			inputSymbol(code, '\t');
+			inputSymbolBase(code, '\t');
 	}
 }
 
 static void selectAll(Code* code)
 {
 	code->cursor.selection = code->src;
-		code->cursor.position = code->cursor.selection + strlen(code->cursor.selection);
+	code->cursor.position = code->cursor.selection + strlen(code->cursor.selection);
 }
 
 static void copyToClipboard(Code* code)
@@ -556,7 +555,8 @@ static void cutToClipboard(Code* code)
 {
 	copyToClipboard(code);
 	replaceSelection(code);
-	history(code);
+	code->changed = true;
+
 }
 
 static void copyFromClipboard(Code* code)
@@ -592,9 +592,7 @@ static void copyFromClipboard(Code* code)
 
 				code->cursor.position += size;
 
-				history(code);
-
-				parseSyntaxColor(code);
+				code->changed = true;
 			}
 
 			getSystem()->freeClipboardText(clipboard);
@@ -610,17 +608,15 @@ static void update(Code* code)
 
 static void undo(Code* code)
 {
-	history_undo(code->history);
-	history_undo(code->cursorHistory);
-
+	history_undo_to_kind(code->cursorHistory, HISTORY_KIND_BEFORE);
+	history_undo_to_kind(code->history, HISTORY_KIND_BEFORE);
 	update(code);
 }
 
 static void redo(Code* code)
 {
-	history_redo(code->history);
-	history_redo(code->cursorHistory);
-
+	history_redo_to_kind(code->cursorHistory, HISTORY_KIND_AFTER);
+	history_redo_to_kind(code->history, HISTORY_KIND_AFTER);
 	update(code);
 }
 
@@ -664,7 +660,6 @@ static void doTab(Code* code, bool shift, bool crtl)
 				memmove(line + 1, line, strlen(line)+1);
 				*line = '\t';
 				end++;
-
 				changed = true;
 			}
 			
@@ -679,12 +674,14 @@ static void doTab(Code* code, bool shift, bool crtl)
 				code->cursor.selection = end;
 			}
 			else if (start <= end) code->cursor.position = end;
-			
-			history(code);
-			parseSyntaxColor(code);
+
+			code->changed = true;
 		}
 	}
-	else inputSymbolBase(code, '\t');
+	else
+	{
+		inputSymbolBase(code, '\t');
+	} 
 }
 
 static void setFindMode(Code* code)
@@ -880,11 +877,10 @@ static void commentLine(Code* code)
 			code->cursor.position -= size;
 	}
 
-	code->cursor.selection = NULL;	
+	code->cursor.selection = NULL;
 
-	history(code);
-
-	parseSyntaxColor(code);
+	code->changed = true;
+	
 }
 
 static void processKeyboard(Code* code)
@@ -1028,6 +1024,10 @@ static void textEditTick(Code* code)
 {
 	tic_mem* tic = code->tic;
 
+	static char beforeCode[TIC_CODE_SIZE];
+	memcpy(beforeCode, code->src, TIC_CODE_SIZE);
+	Cursor beforeCursor = code->cursor;
+
 	// process scroll
 	{
 		tic80_input* input = &code->tic->ram.input;
@@ -1053,6 +1053,28 @@ static void textEditTick(Code* code)
 			inputSymbol(code, sym);
 			updateEditor(code);
 		}
+	}
+
+	if(code->changed)
+	{
+		Cursor afterCursor = code->cursor;
+		code->cursor = beforeCursor;
+		history_add_with_kind(code->cursorHistory, HISTORY_KIND_BEFORE);
+		code->cursor = afterCursor;
+		history_add_with_kind(code->cursorHistory, HISTORY_KIND_AFTER);
+
+		static char afterCode[TIC_CODE_SIZE];
+		memcpy(afterCode, code->src, TIC_CODE_SIZE);
+
+		memcpy(code->src, beforeCode, TIC_CODE_SIZE);
+		history_add_with_kind(code->history, HISTORY_KIND_BEFORE);
+
+		memcpy(code->src, afterCode, TIC_CODE_SIZE);
+		history_add_with_kind(code->history, HISTORY_KIND_AFTER);
+
+		update(code);
+
+		code->changed = false;
 	}
 
 	processMouse(code);

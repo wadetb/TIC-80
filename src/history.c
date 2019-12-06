@@ -26,23 +26,6 @@
 #include <stdio.h>
 #include <string.h>
 
-typedef struct
-{
-	u8* buffer;
-	u32 start;
-	u32 end;
-} Data;
-
-typedef struct Item Item;
-
-struct Item
-{
-	Item* next;
-	Item* prev;
-
-	Data data;
-};
-
 static void list_delete(Item* list, Item* from)
 {
 	Item* it = from;
@@ -58,11 +41,12 @@ static void list_delete(Item* list, Item* from)
 	}
 }
 
-static Item* list_insert(Item* list, Data* data)
+static Item* list_insert(Item* list, s32 kind, Data* data)
 {
 	Item* item = (Item*)malloc(sizeof(Item));
 	item->next = NULL;
 	item->prev = NULL;
+	item->kind = kind;
 	item->data = *data;
 
 	if(list)
@@ -84,16 +68,6 @@ static Item* list_first(Item* list)
 	return it;
 }
 
-struct History
-{
-	Item* list;
-
-	u32 size;
-	u8* state;
-
-	void* data;
-};
-
 History* history_create(void* data, u32 size)
 {
 	History* history = (History*)malloc(sizeof(History));
@@ -102,11 +76,13 @@ History* history_create(void* data, u32 size)
 	history->list = NULL;
 	history->size = size;
 
-	history->state = malloc(size);
-	memcpy(history->state, data, history->size);
+	Data initial;
+	initial.start = 0;
+	initial.end = size;
+	initial.buffer = (u8*)malloc(size);
+	memcpy(initial.buffer, data, size);
 
-	// empty diff
-	history->list = list_insert(history->list, &(Data){NULL, 0, 0});
+	history->list = list_insert(history->list, 0, &initial);
 
 	return history;
 }
@@ -115,79 +91,116 @@ void history_delete(History* history)
 {
 	if(history)
 	{
-		free(history->state);
-
 		list_delete(history->list, list_first(history->list));
 
 		free(history);
 	}
 }
 
-static void history_diff(History* history, Data* data)
+static void history_apply(History* history, Data* data)
 {
 	for (u32 i = data->start, k = 0; i < data->end; ++i, ++k)
-		history->state[i] ^= data->buffer[k];
+		((u8*)history->data)[i] = data->buffer[k];
 }
 
-static u32 trim_left(u8* data, u32 size)
+void history_print(History* history)
 {
-	for(u32 i = 0; i < size; i++)
-		if(data[i]) return i;
+	printf("<<< HISTORY %p >>>>\n", history);
 
-	return size;
+	static const char* kinds[] = {"NONE", "BEFORE", "AFTER"};
+
+	Item* item = history->list;
+	for(; item->prev != NULL; item = item->prev)
+		;
+
+	int i = 0;
+	for(; item != NULL; item = item->next, i++)
+		printf("%d: %s %d-%d %s\n", i, item == history->list ? ">>>" : "", 
+			item->data.start, item->data.end, kinds[item->kind]);
 }
 
-static u32 trim_right(u8* data, u32 size)
+void history_add_with_kind(History* history, s32 kind)
 {
-	for(u32 i = 0; i < size; i++)
-		if(data[size - i - 1]) return size - i;
-
-	return 0;
-}
-
-bool history_add(History* history)
-{
-	if (memcmp(history->state, history->data, history->size) == 0) return false;
-
-	history_diff(history, &(Data){history->data, 0, history->size});
+	printf("=== BEFORE ADD TO HISTORY %p ===\n", history);
+	history_print(history);
 
 	{
 		Data data;
-		data.start = trim_left(history->state, history->size);
-		data.end = trim_right(history->state, history->size);
-		u32 size = data.end - data.start;
-		data.buffer = malloc(size);
 
-		memcpy(data.buffer, (u8*)history->state + data.start, size);
+		data.start = 0;
+		data.end = history->size;
+		// for(data.start = 0; data.start < history->size; data.start++)
+		// 	if(history->state[data.start] != ((u8*)history->data)[data.start])
+		// 		break;
+		// for(data.end = history->size - 1; data.end > 0; data.end--)
+		// 	if(history->state[data.end] != ((u8*)history->data)[data.end])
+		// 		break;
+		// data.end++;
 
-		history->list = list_insert(history->list, &data);
+		if(data.start < data.end)
+		{
+			u32 size = data.end - data.start;
+			data.buffer = malloc(size);
+
+			memcpy(data.buffer, (u8*)history->data + data.start, size);
+		}
+		else
+		{
+			data.buffer = NULL;
+		}
+
+		history->list = list_insert(history->list, kind, &data);
 	}
 
-	memcpy(history->state, history->data, history->size);
+	printf("=== AFTER ADD TO HISTORY %p ===\n", history);
+	history_print(history);
+}
 
-	return true;
+void history_add(History* history)
+{
+	history_add_with_kind(history, 0);
+}
+
+void history_undo_to_kind(History* history, s32 kind)
+{
+	printf("=== BEFORE UNDO HISTORY %p ===\n", history);
+	history_print(history);
+
+	while(history->list->prev)
+	{
+		history->list = history->list->prev;
+		history_apply(history, &history->list->data);
+		if(history->list->kind == kind)
+			break;
+	}
+
+	printf("=== AFTER UNDO HISTORY %p ===\n", history);
+	history_print(history);
 }
 
 void history_undo(History* history)
 {
-	if(history->list->prev)
-	{
-		history_diff(history, &history->list->data);
+	history_undo_to_kind(history, 0);
+}
 
-		history->list = history->list->prev;
+void history_redo_to_kind(History* history, s32 kind)
+{
+	printf("=== BEFORE REDO HISTORY %p ===\n", history);
+	history_print(history);
+
+	while(history->list->next)
+	{
+		history->list = history->list->next;
+		history_apply(history, &history->list->data);
+		if(history->list->kind == kind)
+			break;
 	}
 
-	memcpy(history->data, history->state, history->size);
+	printf("=== AFTER REDO HISTORY %p ===\n", history);
+	history_print(history);
 }
 
 void history_redo(History* history)
 {
-	if(history->list->next)
-	{
-		history->list = history->list->next;
-
-		history_diff(history, &history->list->data);
-	}
-
-	memcpy(history->data, history->state, history->size);
+	history_redo_to_kind(history, 0);
 }
