@@ -49,6 +49,9 @@
 #define CONFIG_TIC "config " TIC_VERSION_LABEL ".tic"
 #define CONFIG_TIC_PATH TIC_LOCAL CONFIG_TIC
 
+#define AUTOSAVE_TIC "autosave.tic"
+#define AUTOSAVE_TIC_PATH TIC_LOCAL AUTOSAVE_TIC
+
 #define KEYMAP_COUNT (sizeof(tic80_gamepads) * BITS_IN_BYTE)
 #define KEYMAP_SIZE (KEYMAP_COUNT)
 #define KEYMAP_DAT "keymap.dat"
@@ -154,6 +157,10 @@ void gotoCode();
 void gotoSurf();
 void exitFromGameMenu();
 void runProject();
+
+void setCartEdited();
+void clearAutoSave();
+bool loadAutoSave();
 
 tic_tiles* getBankTiles();
 tic_palette* getBankPalette();

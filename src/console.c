@@ -2811,28 +2811,43 @@ static void tick(Console* console)
 
 	if(console->tickCounter == 0)
 	{
-		if(!console->embed.yes)
+		if(console->embed.yes)
 		{
-#if defined(TIC_BUILD_WITH_LUA)
-			loadDemo(console, LuaScript);
-#elif defined(TIC_BUILD_WITH_JS)
-			loadDemo(console, JavaScript);
-#elif defined(TIC_BUILD_WITH_WREN)
-			loadDemo(console, WrenScript);
-#elif defined(TIC_BUILD_WITH_SQUIRREL)
-			loadDemo(console, SquirrelScript);
-#endif			
-
-			printBack(console, "\n hello! type ");
-			printFront(console, "help");
-			printBack(console, " for help\n");
-
-			if(getConfig()->checkNewVersion)
-				checkNewVersion(console);
-
-			commandDone(console);
+			printBack(console, "\n loading cart...");
 		}
-		else printBack(console, "\n loading cart...");
+		else
+		{
+			if(loadAutoSave())
+			{
+				printBack(console, "\n autosave loaded!\n");
+
+				if(getConfig()->checkNewVersion)
+					checkNewVersion(console);
+
+				commandDone(console);
+			}
+			else 
+			{
+	#if defined(TIC_BUILD_WITH_LUA)
+				loadDemo(console, LuaScript);
+	#elif defined(TIC_BUILD_WITH_JS)
+				loadDemo(console, JavaScript);
+	#elif defined(TIC_BUILD_WITH_WREN)
+				loadDemo(console, WrenScript);
+	#elif defined(TIC_BUILD_WITH_SQUIRREL)
+				loadDemo(console, SquirrelScript);
+	#endif			
+
+				printBack(console, "\n hello! type ");
+				printFront(console, "help");
+				printBack(console, " for help\n");
+
+				if(getConfig()->checkNewVersion)
+					checkNewVersion(console);
+
+				commandDone(console);
+			}
+		}
 	}
 
 	tic->api.clear(tic, TIC_COLOR_BG);
@@ -2915,7 +2930,9 @@ static bool cmdLoadCart(Console* console, const char* name)
 			console->embed.yes = true;
 			done = true;
 		}
-		
+
+		clearAutoSave();
+
 		free(data);
 	}
 

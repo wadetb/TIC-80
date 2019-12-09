@@ -138,6 +138,12 @@ static struct
 		char text[STUDIO_TEXT_BUFFER_WIDTH];
 	} tooltip;
 
+	struct  
+	{
+		bool edited;
+		s32 counter;
+	} autosave;
+
 	struct
 	{
 		bool record;
@@ -859,6 +865,8 @@ static void showPopupMessage(const char* text)
 
 static void exitConfirm(bool yes, void* data)
 {
+	clearAutoSave();
+
 	impl.studio.quit = yes;
 }
 
@@ -1139,6 +1147,7 @@ void studioRomSaved()
 	updateTitle();
 	updateHash();
 	updateMDate();
+	clearAutoSave();
 }
 
 void studioRomLoaded()
@@ -1148,6 +1157,7 @@ void studioRomLoaded()
 	updateTitle();
 	updateHash();
 	updateMDate();
+	clearAutoSave();
 }
 
 bool studioCartChanged()
@@ -1462,6 +1472,64 @@ static void updateStudioProject()
 
 }
 
+void setCartEdited()
+{
+	impl.autosave.edited = true;
+	impl.autosave.counter = 0;
+}
+
+void clearAutoSave()
+{
+	fsDeleteFile(impl.fs, AUTOSAVE_TIC_PATH);
+}
+
+static void autoSaveCart()
+{
+	tic_mem* tic = impl.tic80local->memory;
+
+	u8* buffer = (u8*)malloc(sizeof(tic_cartridge) * 3);
+
+	s32 size = tic->api.save(&tic->cart, buffer);
+	if(size)
+		fsSaveFile(impl.fs, AUTOSAVE_TIC_PATH, buffer, size, true);
+
+	free(buffer);
+}
+
+bool loadAutoSave()
+{
+	s32 size = 0;
+	void* data = fsLoadFile(impl.fs, AUTOSAVE_TIC_PATH, &size);
+	if(data)
+	{
+        tic_mem* tic = impl.tic80local->memory;
+
+        tic->api.load(&tic->cart, data, size);
+
+		Code* code = impl.editor[impl.bank.index.code].code;
+		if(code->update)
+			code->update(code);
+
+		free(data);
+
+		return true;
+	}
+	else return false;
+}
+
+static void processAutosave()
+{
+	if(impl.autosave.edited)
+	{
+		impl.autosave.counter++;
+		if(impl.autosave.counter > 1 * TIC80_FRAMERATE)
+		{
+			autoSaveCart();
+			impl.autosave.edited = false;
+		}
+	}
+}
+
 static void drawRecordLabel(u32* frame, s32 sx, s32 sy, const u32* color)
 {
 	static const u16 RecLabel[] =
@@ -1742,6 +1810,8 @@ static void studioTick()
 	processShortcuts();
 	processMouseStates();
 	processGamepadMapping();
+
+	processAutosave();
 
 	renderStudio();
 

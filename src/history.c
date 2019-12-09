@@ -21,6 +21,7 @@
 // SOFTWARE.
 
 #include "history.h"
+#include "studio.h"
 
 #include <stdlib.h>
 #include <stdio.h>
@@ -164,6 +165,8 @@ bool history_add(History* history)
 	}
 
 	memcpy(history->state, history->data, history->size);
+
+	setCartEdited();
 
 	return true;
 }
