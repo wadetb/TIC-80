@@ -39,17 +39,8 @@ struct OutlineItem
 #define OUTLINE_SIZE ((TIC80_HEIGHT - TOOLBAR_SIZE*2)/TIC_FONT_HEIGHT)
 #define OUTLINE_ITEMS_SIZE (OUTLINE_SIZE * sizeof(OutlineItem))
 
-static void preHistory(Code* code)
-{
-	history_add(code->history);
-	history_add(code->cursorHistory);
-}
-
-static void postHistory(Code* code)
-{
-	history_add(code->history);
-	history_add(code->cursorHistory);
-}
+#define CURSOR_BEFORE_EDIT 1
+#define CURSOR_AFTER_EDIT 2
 
 static void drawStatus(Code* code)
 {
@@ -608,7 +599,7 @@ static void update(Code* code)
 static void undo(Code* code)
 {
 	history_undo(code->history);
-	history_undo(code->cursorHistory);
+	history_undo_to_tag(code->cursorHistory, CURSOR_BEFORE_EDIT);
 
 	update(code);
 }
@@ -616,7 +607,7 @@ static void undo(Code* code)
 static void redo(Code* code)
 {
 	history_redo(code->history);
-	history_redo(code->cursorHistory);
+	history_redo_to_tag(code->cursorHistory, CURSOR_AFTER_EDIT);
 
 	update(code);
 }
@@ -1055,9 +1046,9 @@ static void textEditTick(Code* code)
 	{
 		Cursor afterCursor = code->cursor;
 		code->cursor = beforeCursor;
-		history_add_skip(code->cursorHistory);
+		history_add_with_tag(code->cursorHistory, CURSOR_BEFORE_EDIT);
 		code->cursor = afterCursor;
-		history_add(code->cursorHistory);
+		history_add_with_tag(code->cursorHistory, CURSOR_AFTER_EDIT);
 
 		history_add(code->history);
 
@@ -1525,8 +1516,6 @@ void initCode(Code* code, tic_mem* tic, tic_code* src)
 
 	code->history = history_create(code->src, sizeof(tic_code));
 	code->cursorHistory = history_create(&code->cursor, sizeof code->cursor);
-
-	history_add(code->history);
 
 	update(code);
 }

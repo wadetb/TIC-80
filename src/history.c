@@ -40,7 +40,8 @@ struct Item
 	Item* next;
 	Item* prev;
 
-	bool skip;
+	s32 tag;
+
 	Data data;
 };
 
@@ -59,12 +60,12 @@ static void list_delete(Item* list, Item* from)
 	}
 }
 
-static Item* list_insert(Item* list, bool skip, Data* data)
+static Item* list_insert(Item* list, s32 tag, Data* data)
 {
 	Item* item = (Item*)malloc(sizeof(Item));
 	item->next = NULL;
 	item->prev = NULL;
-	item->skip = skip;
+	item->tag = tag;
 	item->data = *data;
 
 	if(list)
@@ -107,6 +108,8 @@ History* history_create(void* data, u32 size)
 	history->state = (u8*)malloc(size);
 	memcpy(history->state, data, size);
 
+	history_add(history);
+
 	return history;
 }
 
@@ -148,22 +151,20 @@ void history_print(History* history)
 {
 	printf("<<< HISTORY %p >>>>\n", history);
 
-	static const char* kinds[] = {"NORMAL", "skip"};
-
 	Item* item = history->list;
 	for(; item && item->prev != NULL; item = item->prev)
 		;
 
 	int i = 0;
 	for(; item; item = item->next, i++)
-		printf("%d: %p %s %d-%d %s\n", i, item, item == history->list ? ">>>" : "", 
-			item->data.start, item->data.end, kinds[item->skip]);
+		printf("%d: %p %s %d-%d %d\n", i, item, item == history->list ? ">>>" : "", 
+			item->data.start, item->data.end, item->tag);
 }
 
-static void history_add_internal(History* history, bool skip)
+void history_add_with_tag(History* history, s32 tag)
 {
-	printf("=== BEFORE ADD TO HISTORY %p ===\n", history);
-	history_print(history);
+	// printf("=== BEFORE ADD TO HISTORY %p ===\n", history);
+	// history_print(history);
 
 	history_diff(history, &(Data){history->data, 0, history->size});
 
@@ -181,7 +182,7 @@ static void history_add_internal(History* history, bool skip)
 		}
 		else data.buffer = NULL;
 
-		history->list = list_insert(history->list, skip, &data);
+		history->list = list_insert(history->list, tag, &data);
 	}
 
 	memcpy(history->state, history->data, history->size);
@@ -190,25 +191,15 @@ static void history_add_internal(History* history, bool skip)
 	history_print(history);
 }
 
-void history_add(History* history)
+void history_undo_to_tag(History* history, s32 tag)
 {
-	history_add_internal(history, false);
-}
-
-void history_add_skip(History* history)
-{
-	history_add_internal(history, true);
-}
-
-void history_undo(History* history)
-{
-	printf("=== BEFORE UNDO HISTORY %p ===\n", history);
-	history_print(history);
+	// printf("=== BEFORE UNDO HISTORY %p ===\n", history);
+	// history_print(history);
 
 	Item *target = NULL;
 
 	for(Item* iter = history->list->prev; iter; iter = iter->prev)
-		if(!iter->skip)
+		if(iter->tag == tag)
 		{
 			target = iter;
 			break;
@@ -230,15 +221,15 @@ void history_undo(History* history)
 	history_print(history);
 }
 
-void history_redo(History* history)
+void history_redo_to_tag(History* history, s32 tag)
 {
-	printf("=== BEFORE REDO HISTORY %p ===\n", history);
-	history_print(history);
+	// printf("=== BEFORE REDO HISTORY %p ===\n", history);
+	// history_print(history);
 
 	Item *target = NULL;
 
 	for(Item* iter = history->list->next; iter; iter = iter->next)
-		if(!iter->skip)
+		if(iter->tag == tag)
 		{
 			target = iter;
 			break;
@@ -258,4 +249,19 @@ void history_redo(History* history)
 
 	printf("=== AFTER REDO HISTORY %p ===\n", history);
 	history_print(history);
+}
+
+void history_add(History* history)
+{
+	history_add_with_tag(history, 0);
+}
+
+void history_undo(History* history)
+{
+	history_undo_to_tag(history, 0);
+}
+
+void history_redo(History* history)
+{
+	history_redo_to_tag(history, 0);
 }
