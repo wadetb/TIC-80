@@ -149,37 +149,16 @@ static u32 trim_right(u8* data, u32 size)
 	return 0;
 }
 
-void history_print(History* history)
-{
-	printf("<<< HISTORY %p >>>>\n", history);
-
-	Item* item = history->list;
-	for(; item && item->prev != NULL; item = item->prev)
-		;
-
-	int i = 0;
-	for(; item; item = item->next, i++)
-		printf("%d: %p %s %d-%d %d\n", i, item, item == history->list ? ">>>" : "", 
-			item->data.start, item->data.end, item->tag);
-}
-
 void history_add_with_tag(History* history, s32 tag)
 {
-	printf("=== BEFORE REWIND %p ===\n", history);
-	history_print(history);
-
 	if(tag != NO_TAG)
 	{
 		while (history->list && history->list->tag == tag)
 		{
-			printf("<<< REWIND %p >>>>\n", history->list);
 			history_diff(history, &history->list->data);
 			history->list = history->list->prev;
 		}
 	}
-
-	printf("=== AFTER REWIND %p ===\n", history);
-	history_print(history);
 
 	history_diff(history, &(Data){history->data, 0, history->size});
 
@@ -201,16 +180,10 @@ void history_add_with_tag(History* history, s32 tag)
 	}
 
 	memcpy(history->state, history->data, history->size);
-
-	printf("=== AFTER ADD TO HISTORY %p ===\n", history);
-	history_print(history);
 }
 
 void history_undo_to_tag(History* history, s32 tag)
 {
-	// printf("=== BEFORE UNDO HISTORY %p ===\n", history);
-	// history_print(history);
-
 	Item *target = NULL;
 
 	for(Item* iter = history->list->prev; iter; iter = iter->prev)
@@ -224,23 +197,16 @@ void history_undo_to_tag(History* history, s32 tag)
 	{
 		while (history->list != target)
 		{
-			printf("<<< APPLY %p >>>>\n", history->list);
 			history_diff(history, &history->list->data);
 			history->list = history->list->prev;
 		}
 	}
 
 	memcpy(history->data, history->state, history->size);
-
-	printf("=== AFTER UNDO HISTORY %p ===\n", history);
-	history_print(history);
 }
 
 void history_redo_to_tag(History* history, s32 tag)
 {
-	// printf("=== BEFORE REDO HISTORY %p ===\n", history);
-	// history_print(history);
-
 	Item *target = NULL;
 
 	for(Item* iter = history->list->next; iter; iter = iter->next)
@@ -255,15 +221,11 @@ void history_redo_to_tag(History* history, s32 tag)
 		do
 		{
 			history->list = history->list->next;
-			printf("<<< APPLY %p >>>>\n", history->list);
 			history_diff(history, &history->list->data);
 		} while (history->list != target);
 	}
 
 	memcpy(history->data, history->state, history->size);
-
-	printf("=== AFTER REDO HISTORY %p ===\n", history);
-	history_print(history);
 }
 
 void history_add(History* history)
