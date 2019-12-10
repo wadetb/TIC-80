@@ -26,6 +26,8 @@
 #include <stdio.h>
 #include <string.h>
 
+#define NO_TAG -1
+
 typedef struct
 {
 	u8* buffer;
@@ -163,8 +165,21 @@ void history_print(History* history)
 
 void history_add_with_tag(History* history, s32 tag)
 {
-	// printf("=== BEFORE ADD TO HISTORY %p ===\n", history);
-	// history_print(history);
+	printf("=== BEFORE REWIND %p ===\n", history);
+	history_print(history);
+
+	if(tag != NO_TAG)
+	{
+		while (history->list && history->list->tag == tag)
+		{
+			printf("<<< REWIND %p >>>>\n", history->list);
+			history_diff(history, &history->list->data);
+			history->list = history->list->prev;
+		}
+	}
+
+	printf("=== AFTER REWIND %p ===\n", history);
+	history_print(history);
 
 	history_diff(history, &(Data){history->data, 0, history->size});
 
@@ -253,15 +268,15 @@ void history_redo_to_tag(History* history, s32 tag)
 
 void history_add(History* history)
 {
-	history_add_with_tag(history, 0);
+	history_add_with_tag(history, NO_TAG);
 }
 
 void history_undo(History* history)
 {
-	history_undo_to_tag(history, 0);
+	history_undo_to_tag(history, NO_TAG);
 }
 
 void history_redo(History* history)
 {
-	history_redo_to_tag(history, 0);
+	history_redo_to_tag(history, NO_TAG);
 }

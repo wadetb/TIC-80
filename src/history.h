@@ -35,4 +35,3 @@ void history_delete(History* history);
 void history_add_with_tag(History* history, s32 tag);
 void history_undo_to_tag(History* history, s32 tag);
 void history_redo_to_tag(History* history, s32 tag);
-void history_trim_to_tag(History* history, s32 tag);
