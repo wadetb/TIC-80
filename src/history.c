@@ -84,7 +84,7 @@ static Item* list_insert(Item* list, s32 tag, Data* data)
 static Item* list_first(Item* list)
 {
 	Item* it = list;
-	while(it && it->prev) it = it->prev;
+	while(it->prev) it = it->prev;
 
 	return it;
 }
@@ -107,8 +107,8 @@ History* history_create(void* data, u32 size)
 	history->list = NULL;
 	history->size = size;
 
-	history->state = (u8*)malloc(size);
-	memcpy(history->state, data, size);
+	history->state = malloc(size);
+	memcpy(history->state, data, history->size);
 
 	history_add(history);
 
@@ -241,4 +241,10 @@ void history_undo(History* history)
 void history_redo(History* history)
 {
 	history_redo_to_tag(history, NO_TAG);
+}
+
+void history_add_if_changed(History* history)
+{
+	if(memcmp(history->data, history->state, history->size))
+		history_add_with_tag(history, NO_TAG);
 }

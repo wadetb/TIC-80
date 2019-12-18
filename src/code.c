@@ -476,8 +476,7 @@ static void deleteWord(Code* code)
 		if(isalnum_(*pos)) while(pos < end && isalnum_(*pos)) pos++;
 		else while(pos < end && !isalnum_(*pos)) pos++;
 		memmove(code->cursor.position, pos, strlen(pos) + 1);
-		history(code);
-		parseSyntaxColor(code);
+		code->changed = true;
 	}
 }
 
@@ -492,8 +491,7 @@ static void backspaceWord(Code* code)
 		else while(pos > start && !isalnum_(*(pos-1))) pos--;
 		memmove(pos, code->cursor.position, strlen(code->cursor.position) + 1);
 		code->cursor.position = pos;
-		history(code);
-		parseSyntaxColor(code);
+		code->changed = true;
 	}
 }
 
@@ -583,7 +581,6 @@ static void cutToClipboard(Code* code)
 	copyToClipboard(code);
 	replaceSelection(code);
 	code->changed = true;
-
 }
 
 static void copyFromClipboard(Code* code)
@@ -1105,11 +1102,14 @@ static void textEditTick(Code* code)
 		}
 	}
 
+	processMouse(code);
+
 	if(code->changed)
 	{
 		Cursor afterCursor = code->cursor;
 		code->cursor = beforeCursor;
 		history_add_with_tag(code->cursorHistory, CURSOR_BEFORE_EDIT);
+
 		code->cursor = afterCursor;
 		history_add_with_tag(code->cursorHistory, CURSOR_AFTER_EDIT);
 
@@ -1119,8 +1119,6 @@ static void textEditTick(Code* code)
 
 		code->changed = false;
 	}
-
-	processMouse(code);
 
 	code->tic->api.clear(code->tic, getConfig()->theme.code.bg);
 
