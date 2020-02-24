@@ -680,7 +680,7 @@ if(BUILD_SDL)
 		set(TIC80_SRC ${TIC80_SRC} ${CMAKE_SOURCE_DIR}/src/ext/file_dialog.m)
 	endif()
 
-	set(TIC80_SRC ${TIC80_SRC} src/system/sdlgpu.c)
+	set(TIC80_SRC ${TIC80_SRC} src/system/sdl.c)
 
 	if(WIN32)
 		
